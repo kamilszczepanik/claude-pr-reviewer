@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { rightLinesByPath, truncateDiff } from "../scripts/lib/diff.mjs";
+import { rightLinesByPath, splitDiffByFile, truncateDiff } from "../scripts/lib/diff.mjs";
 import { skipReasonFor } from "../scripts/lib/failure.mjs";
 import { parseReview, selectComments } from "../scripts/lib/review-result.mjs";
 
@@ -19,7 +19,7 @@ const SAMPLE_DIFF = [
   fileDiff({
     path: "src/app.ts",
     hunk: [
-      "@@ -10,4 +10,5 @@ export const run = () => {",
+      "@@ -10,3 +10,4 @@ export const run = () => {",
       " const a = 1;",
       "-const b = 2;",
       "+const b = 3;",
@@ -51,6 +51,39 @@ describe("rightLinesByPath", () => {
     assert.deepEqual([...lines.get("docs/readme.md")], [1]);
     assert.equal(lines.has("old.ts"), false);
   });
+});
+
+const QUOTED_PATH = '"b/\\305\\274\\303\\263\\305\\202w.md"';
+
+describe("diff parsing edge cases", () => {
+  const cases = [
+    {
+      label: "an added line that starts with ++",
+      diff: fileDiff({ path: "a.md", hunk: ["@@ -1,1 +1,3 @@", " x", "+++ not a header", "+y"].join("\n") }),
+      path: "a.md",
+      lines: [1, 2, 3],
+    },
+    {
+      label: "a quoted non-ASCII path",
+      diff: [
+        `diff --git ${QUOTED_PATH.replace("b/", "a/")} ${QUOTED_PATH}`,
+        "new file mode 100644",
+        "--- /dev/null",
+        `+++ ${QUOTED_PATH}`,
+        "@@ -0,0 +1 @@",
+        "+x",
+        "",
+      ].join("\n"),
+      path: "\u017C\u00F3\u0142w.md",
+      lines: [1],
+    },
+  ];
+  for (const { label, diff, path, lines } of cases) {
+    it(`maps ${label}`, () => {
+      assert.deepEqual([...rightLinesByPath(diff).get(path)], lines);
+      assert.deepEqual(splitDiffByFile(diff).map((file) => file.path), [path]);
+    });
+  }
 });
 
 describe("truncateDiff", () => {
