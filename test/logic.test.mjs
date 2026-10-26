@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { rightLinesByPath, truncateDiff } from "../scripts/lib/diff.mjs";
+import { parseReview, selectComments } from "../scripts/lib/review-result.mjs";
 
 const fileDiff = ({ path, hunk }) =>
   [
@@ -82,4 +83,50 @@ describe("truncateDiff", () => {
       );
     });
   }
+});
+
+describe("parseReview", () => {
+  it("accepts a well-formed review", () => {
+    const review = parseReview({
+      summary: "Jedna uwaga.",
+      comments: [{ path: "src/app.ts", line: 12, severity: "high", body: "Popraw." }],
+    });
+    assert.equal(review.comments.length, 1);
+  });
+
+  const invalid = [
+    { label: "missing summary", value: { comments: [] } },
+    { label: "unknown severity", value: { summary: "x", comments: [{ path: "a", line: 1, severity: "nit", body: "b" }] } },
+    { label: "line below one", value: { summary: "x", comments: [{ path: "a", line: 0, severity: "low", body: "b" }] } },
+    { label: "not an object", value: "plain text" },
+  ];
+  for (const { label, value } of invalid) {
+    it(`throws on ${label}`, () => {
+      assert.throws(() => parseReview(value));
+    });
+  }
+});
+
+describe("selectComments", () => {
+  it("drops lines outside the diff and keeps the most severe up to the cap", () => {
+    const validLines = rightLinesByPath(SAMPLE_DIFF);
+    const comment = (path, line, severity) => ({ path, line, severity, body: severity });
+    const { comments, droppedOutsideDiff, droppedOverCap } = selectComments({
+      comments: [
+        comment("src/app.ts", 11, "low"),
+        comment("src/app.ts", 99, "critical"),
+        comment("old.ts", 1, "high"),
+        comment("docs/readme.md", 1, "medium"),
+        comment("src/app.ts", 12, "critical"),
+      ],
+      validLines,
+      maxComments: 2,
+    });
+    assert.deepEqual(
+      comments.map(({ path, line }) => `${path}:${line}`),
+      ["src/app.ts:12", "docs/readme.md:1"],
+    );
+    assert.equal(droppedOutsideDiff, 2);
+    assert.equal(droppedOverCap, 1);
+  });
 });
