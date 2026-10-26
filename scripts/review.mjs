@@ -4,37 +4,42 @@ import { rightLinesByPath, truncateDiff } from './lib/diff.mjs';
 import { skipError } from './lib/failure.mjs';
 import { createGithub } from './lib/github.mjs';
 import { buildPrompt, readRubric, SYSTEM_PROMPT } from './lib/prompt.mjs';
-import { buildReviewBody, redactSecrets, toInlineComment } from './lib/review-body.mjs';
+import { failureLine, publishReview, settleReview } from './lib/publish.mjs';
+import { buildReviewBody, buildShortBody, cleanReview, toInlineComment } from './lib/review-body.mjs';
 import { selectComments } from './lib/review-result.mjs';
 
 const DIFF_TOO_LARGE = 406;
-const UNPROCESSABLE = 422;
-const MAX_ERROR_LOG_CHARS = 300;
 
-const fetchDiff = async (github) => {
+const log = (line) => console.log(line);
+
+const fetchDiff = async ({ github, baseSha, headSha }) => {
   try {
-    return await github.diff();
+    return await github.diff({ baseSha, headSha });
   } catch (error) {
     if (error.status === DIFF_TOO_LARGE) throw skipError('diff za duży dla API GitHuba');
     throw error;
   }
 };
 
-const postReview = async ({ github, commitId, body, comments, fallbackBody }) => {
-  try {
-    await github.postReview({ commitId, body, comments });
-  } catch (error) {
-    if (error.status !== UNPROCESSABLE || comments.length === 0) throw error;
-    await github.postReview({ commitId, body: fallbackBody, comments: [] });
-  }
+const reviewAttempts = ({ headSha, review, bodyInput }) => {
+  const inline = review.comments.map(toInlineComment);
+  return [
+    { commitId: headSha, body: buildReviewBody(bodyInput), comments: inline },
+    ...(inline.length > 0
+      ? [{ commitId: headSha, body: buildReviewBody({ ...bodyInput, fallbackComments: review.comments }), comments: [] }]
+      : []),
+    { body: buildShortBody(bodyInput), comments: [] },
+  ];
 };
 
 const reviewPullRequest = async ({ config, github }) => {
   if (!config.apiKey) throw skipError('brak sekretu ANTHROPIC_API_KEY');
   const pullRequest = await github.pullRequest();
-  const fullDiff = await fetchDiff(github);
+  const headSha = config.headSha ?? pullRequest.head.sha;
+  const fullDiff = await fetchDiff({ github, baseSha: pullRequest.base.sha, headSha });
   const { diff, omittedFiles } = truncateDiff({ diff: fullDiff, maxBytes: config.maxDiffBytes });
-  console.log(`Przegląd PR #${config.prNumber}: diff ${Buffer.byteLength(diff)} B, pominięte pliki ${omittedFiles.length}`);
+  const rubric = await readRubric(config.repoDir);
+  log(`Przegląd PR #${config.prNumber}: diff ${Buffer.byteLength(diff)} B, pominięte pliki ${omittedFiles.length}`);
   const { review, turns, tokens } = await runAgentReview({
     model: config.model,
     cwd: config.repoDir,
@@ -42,7 +47,7 @@ const reviewPullRequest = async ({ config, github }) => {
     prompt: buildPrompt({
       title: pullRequest.title,
       description: pullRequest.body,
-      rubric: await readRubric(config.repoDir),
+      rubric,
       diff,
       omittedFiles,
       maxComments: config.maxComments,
@@ -53,36 +58,23 @@ const reviewPullRequest = async ({ config, github }) => {
     validLines: rightLinesByPath(fullDiff),
     maxComments: config.maxComments,
   });
-  const clean = (text) => redactSecrets({ text, secrets: [config.apiKey, config.githubToken] });
-  const cleanComments = comments.map((comment) => ({ ...comment, body: clean(comment.body) }));
-  const bodyInput = { summary: clean(review.summary), model: config.model, turns, tokens, omittedFiles, droppedOverCap };
-  await postReview({
-    github,
-    commitId: config.headSha ?? pullRequest.head.sha,
-    body: buildReviewBody(bodyInput),
-    comments: cleanComments.map(toInlineComment),
-    fallbackBody: buildReviewBody({ ...bodyInput, fallbackComments: cleanComments }),
-  });
-  console.log(
-    `Wynik: ${comments.length} uwag w linii, poza diffem ${droppedOutsideDiff}, tury ${turns}, tokeny ${tokens.input}/${tokens.output}`,
+  const clean = cleanReview({ review: { summary: review.summary, comments }, secrets: [config.apiKey, config.githubToken] });
+  const bodyInput = { summary: clean.summary, model: config.model, turns, tokens, omittedFiles, droppedOverCap };
+  const used = await publishReview({ github, attempts: reviewAttempts({ headSha, review: clean, bodyInput }) });
+  log(
+    `Wynik: ${comments.length} uwag, wariant publikacji ${used}, poza diffem ${droppedOutsideDiff}, tury ${turns}, tokeny ${tokens.input}/${tokens.output}`,
   );
 };
 
 const main = async () => {
   const config = await readConfig(process.env);
   const github = createGithub({ token: config.githubToken, repo: config.repo, prNumber: config.prNumber });
-  try {
-    await reviewPullRequest({ config, github });
-  } catch (error) {
-    if (!error.skipReason) throw error;
-    console.log(`Przegląd Claude pominięty: ${error.skipReason}`);
-    await github.postComment(`Przegląd Claude pominięty: ${error.skipReason}`);
-  }
+  return settleReview({ run: () => reviewPullRequest({ config, github }), github, log });
 };
 
 try {
-  await main();
+  process.exitCode = await main();
 } catch (error) {
-  console.error(`Przegląd Claude nie powiódł się: ${String(error.message).slice(0, MAX_ERROR_LOG_CHARS)}`);
+  console.error(failureLine(error));
   process.exitCode = 1;
 }
