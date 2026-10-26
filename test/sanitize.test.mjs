@@ -19,7 +19,11 @@ describe('sanitizeMarkdown', () => {
       text: '![x][1]\n\n[1]: https://evil.test/a.png',
       expected: '(obraz usunięty)\n\n',
     },
-    { label: 'an html image', text: '<img src="https://evil.test/a.png">', expected: '&lt;img src="https://evil.test/a.png">' },
+    {
+      label: 'an html image',
+      text: '<img src="https://evil.test/a.png">',
+      expected: '&lt;img src="https://evil.test/a.png">',
+    },
     { label: 'an html comment', text: '<!-- ukryte --> tekst', expected: '&lt;!-- ukryte --> tekst' },
     { label: 'a comparison', text: 'gdy a < b', expected: 'gdy a < b' },
     { label: 'a disguised link', text: '[kliknij](https://evil.test)', expected: 'kliknij (https://evil.test)' },

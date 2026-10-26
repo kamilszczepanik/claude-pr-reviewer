@@ -41,7 +41,11 @@ export const createGithub = ({ token, repo, prNumber }) => {
   return {
     pullRequest: () => githubRequest({ token, path: pullPath }),
     diff: ({ baseSha, headSha }) =>
-      githubRequest({ token, path: `repos/${repo}/compare/${baseSha}...${headSha}`, accept: 'application/vnd.github.diff' }),
+      githubRequest({
+        token,
+        path: `repos/${repo}/compare/${baseSha}...${headSha}`,
+        accept: 'application/vnd.github.diff',
+      }),
     postReview: ({ commitId, body, comments }) =>
       githubRequest({
         token,

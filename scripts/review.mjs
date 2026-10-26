@@ -26,7 +26,13 @@ const reviewAttempts = ({ headSha, review, bodyInput }) => {
   return [
     { commitId: headSha, body: buildReviewBody(bodyInput), comments: inline },
     ...(inline.length > 0
-      ? [{ commitId: headSha, body: buildReviewBody({ ...bodyInput, fallbackComments: review.comments }), comments: [] }]
+      ? [
+          {
+            commitId: headSha,
+            body: buildReviewBody({ ...bodyInput, fallbackComments: review.comments }),
+            comments: [],
+          },
+        ]
       : []),
     { body: buildShortBody(bodyInput), comments: [] },
   ];
@@ -61,7 +67,10 @@ const reviewPullRequest = async ({ config, github }) => {
     validLines: rightLinesByPath(fullDiff),
     maxComments: config.maxComments,
   });
-  const clean = cleanReview({ review: { summary: review.summary, comments }, secrets: [config.apiKey, config.githubToken] });
+  const clean = cleanReview({
+    review: { summary: review.summary, comments },
+    secrets: [config.apiKey, config.githubToken],
+  });
   const bodyInput = { summary: clean.summary, model: config.model, turns, tokens, omittedFiles, droppedOverCap };
   const used = await publishReview({ github, attempts: reviewAttempts({ headSha, review: clean, bodyInput }) });
   log(

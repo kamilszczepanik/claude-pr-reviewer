@@ -89,7 +89,11 @@ describe('settleReview', () => {
       assert.equal(await settleReview({ run, github, log: (line) => lines.push(line) }), exitCode);
       assert.equal(github.calls.posted.length, posted);
       assert.equal(github.calls.updated.length, updated);
-      assert.ok([...github.calls.posted, ...github.calls.updated.map((update) => update.body)].every((body) => body.startsWith(SKIP_MARKER)));
+      assert.ok(
+        [...github.calls.posted, ...github.calls.updated.map((update) => update.body)].every((body) =>
+          body.startsWith(SKIP_MARKER),
+        ),
+      );
       assert.ok(lines.length <= 2);
       assert.ok(lines.every((line) => !line.includes('tajny tekst modelu')));
     });
@@ -99,7 +103,10 @@ describe('settleReview', () => {
 describe('review body', () => {
   it('cleans mentions and secrets out of the model output', () => {
     const review = cleanReview({
-      review: { summary: '@kamil klucz sk-ant-api03-abcdefghijkl', comments: [{ path: 'a', line: 1, severity: 'low', body: '![x](https://e.test/p.png)' }] },
+      review: {
+        summary: '@kamil klucz sk-ant-api03-abcdefghijkl',
+        comments: [{ path: 'a', line: 1, severity: 'low', body: '![x](https://e.test/p.png)' }],
+      },
       secrets: [],
     });
     assert.equal(review.summary, '@​kamil klucz [ukryte]');
@@ -109,7 +116,15 @@ describe('review body', () => {
   it('stays under the GitHub body limit with the longest fallback list', () => {
     const long = 'x'.repeat(100_000);
     const review = cleanReview({
-      review: { summary: long, comments: Array.from({ length: 30 }, (_, line) => ({ path: 'a', line: line + 1, severity: 'high', body: long })) },
+      review: {
+        summary: long,
+        comments: Array.from({ length: 30 }, (_, line) => ({
+          path: 'a',
+          line: line + 1,
+          severity: 'high',
+          body: long,
+        })),
+      },
       secrets: [],
     });
     const body = buildReviewBody({

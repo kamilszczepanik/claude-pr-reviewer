@@ -8,7 +8,9 @@ import { describe, it } from 'node:test';
 import { buildPrompt, readRubric } from '../scripts/lib/prompt.mjs';
 
 const git = (repoDir, ...args) =>
-  execFileSync('git', ['-C', repoDir, '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { encoding: 'utf8' }).trim();
+  execFileSync('git', ['-C', repoDir, '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {
+    encoding: 'utf8',
+  }).trim();
 
 describe('buildPrompt', () => {
   it('keeps pull request data inside its own tags and caps the title', () => {

@@ -1,4 +1,4 @@
-const GIT_HEADER = "diff --git ";
+const GIT_HEADER = 'diff --git ';
 const FILE_BOUNDARY = /^(?=diff --git )/m;
 const HUNK_HEADER = /^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/;
 const UNQUOTED_HEADER_PATH = /^diff --git a\/.+ b\/(.+)$/m;
@@ -11,7 +11,7 @@ const C_ESCAPES = {
   f: 12,
   v: 11,
   '"': 34,
-  "\\": 92,
+  '\\': 92,
 };
 
 const unquotePath = (raw) => {
@@ -20,7 +20,7 @@ const unquotePath = (raw) => {
   const inner = raw.slice(1, -1);
   for (let index = 0; index < inner.length; index += 1) {
     const char = inner[index];
-    if (char !== "\\") {
+    if (char !== '\\') {
       bytes.push(...Buffer.from(char));
       continue;
     }
@@ -30,11 +30,11 @@ const unquotePath = (raw) => {
       index += 3;
       continue;
     }
-    const next = inner[index + 1] ?? "\\";
+    const next = inner[index + 1] ?? '\\';
     bytes.push(C_ESCAPES[next] ?? next.charCodeAt(0));
     index += 1;
   }
-  return Buffer.from(bytes).toString("utf8");
+  return Buffer.from(bytes).toString('utf8');
 };
 
 const pathAfter = ({ row, prefix }) => {
@@ -44,26 +44,22 @@ const pathAfter = ({ row, prefix }) => {
 
 const headerPaths = (block) => {
   const paths = { oldPath: null, newPath: null };
-  for (const row of block.split("\n")) {
-    if (row.startsWith("@@")) break;
-    if (row.startsWith("--- "))
-      paths.oldPath = pathAfter({ row, prefix: "a/" });
-    if (row.startsWith("+++ "))
-      paths.newPath = pathAfter({ row, prefix: "b/" });
+  for (const row of block.split('\n')) {
+    if (row.startsWith('@@')) break;
+    if (row.startsWith('--- ')) paths.oldPath = pathAfter({ row, prefix: 'a/' });
+    if (row.startsWith('+++ ')) paths.newPath = pathAfter({ row, prefix: 'b/' });
   }
   return paths;
 };
 
-const fileBlocks = (diff) =>
-  diff.split(FILE_BOUNDARY).filter((block) => block.startsWith(GIT_HEADER));
+const fileBlocks = (diff) => diff.split(FILE_BOUNDARY).filter((block) => block.startsWith(GIT_HEADER));
 
 export const splitDiffByFile = (diff) =>
   fileBlocks(diff)
     .map((block) => {
       const { oldPath, newPath } = headerPaths(block);
       return {
-        path:
-          newPath ?? oldPath ?? block.match(UNQUOTED_HEADER_PATH)?.[1] ?? null,
+        path: newPath ?? oldPath ?? block.match(UNQUOTED_HEADER_PATH)?.[1] ?? null,
         text: block,
       };
     })
@@ -82,7 +78,7 @@ export const truncateDiff = ({ diff, maxBytes }) => {
     kept.push(file.text);
     usedBytes += bytes;
   }
-  return { diff: kept.join(""), omittedFiles };
+  return { diff: kept.join(''), omittedFiles };
 };
 
 const rightLinesOfBlock = (block) => {
@@ -90,20 +86,20 @@ const rightLinesOfBlock = (block) => {
   let oldLeft = 0;
   let newLeft = 0;
   let nextLine = 0;
-  for (const row of block.split("\n")) {
+  for (const row of block.split('\n')) {
     if (oldLeft > 0 || newLeft > 0) {
-      if (row.startsWith("-")) {
+      if (row.startsWith('-')) {
         oldLeft -= 1;
         continue;
       }
-      if (row.startsWith("+") || row.startsWith(" ")) {
+      if (row.startsWith('+') || row.startsWith(' ')) {
         lines.add(nextLine);
         nextLine += 1;
         newLeft -= 1;
-        if (row.startsWith(" ")) oldLeft -= 1;
+        if (row.startsWith(' ')) oldLeft -= 1;
         continue;
       }
-      if (row.startsWith("\\")) continue;
+      if (row.startsWith('\\')) continue;
       oldLeft = 0;
       newLeft = 0;
     }

@@ -28,7 +28,9 @@ const PASSED_ENV = [
 ];
 
 const agentEnv = () =>
-  Object.fromEntries(PASSED_ENV.filter((name) => process.env[name] !== undefined).map((name) => [name, process.env[name]]));
+  Object.fromEntries(
+    PASSED_ENV.filter((name) => process.env[name] !== undefined).map((name) => [name, process.env[name]]),
+  );
 
 const sumTokens = (modelUsage = {}) =>
   Object.values(modelUsage).reduce(
