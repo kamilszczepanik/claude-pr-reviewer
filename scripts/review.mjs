@@ -40,8 +40,9 @@ const reviewPullRequest = async ({ config, github }) => {
   const { diff, omittedFiles } = truncateDiff({ diff: fullDiff, maxBytes: config.maxDiffBytes });
   const rubric = await readRubric(config.repoDir);
   log(`Przegląd PR #${config.prNumber}: diff ${Buffer.byteLength(diff)} B, pominięte pliki ${omittedFiles.length}`);
-  const { review, turns, tokens } = await runAgentReview({
+  const { review, turns, tokens, costUsd, denials } = await runAgentReview({
     model: config.model,
+    maxBudgetUsd: config.maxBudgetUsd,
     cwd: config.repoDir,
     systemPrompt: SYSTEM_PROMPT,
     prompt: buildPrompt({
@@ -62,7 +63,7 @@ const reviewPullRequest = async ({ config, github }) => {
   const bodyInput = { summary: clean.summary, model: config.model, turns, tokens, omittedFiles, droppedOverCap };
   const used = await publishReview({ github, attempts: reviewAttempts({ headSha, review: clean, bodyInput }) });
   log(
-    `Wynik: ${comments.length} uwag, wariant publikacji ${used}, poza diffem ${droppedOutsideDiff}, tury ${turns}, tokeny ${tokens.input}/${tokens.output}`,
+    `Wynik: ${comments.length} uwag, wariant publikacji ${used}, poza diffem ${droppedOutsideDiff}, tury ${turns}, tokeny ${tokens.input}/${tokens.output}, koszt ${costUsd.toFixed(2)} USD, odmowy narzędzi ${denials}`,
   );
 };
 
