@@ -1,0 +1,46 @@
+name: Claude PR reviewer
+description: Reviews a pull request with Claude through the Agent SDK and posts one review with inline comments
+inputs:
+  model:
+    description: Claude model id
+    required: true
+  max-comments:
+    description: Upper bound on inline comments
+    required: true
+  max-diff-bytes:
+    description: Diff size sent to the model, cut at file boundaries
+    required: true
+  pr-number:
+    description: Pull request number
+    required: true
+  head-sha:
+    description: Commit the review is anchored to
+    required: true
+  repo-dir:
+    description: Checkout of the pull request head
+    required: true
+  anthropic-api-key:
+    description: Anthropic API key
+    required: false
+    default: ''
+  github-token:
+    description: Token with pull-requests write
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Install reviewer
+      shell: bash
+      run: npm ci --prefix "$GITHUB_ACTION_PATH" --no-audit --no-fund --loglevel=error
+    - name: Review
+      shell: bash
+      env:
+        REVIEW_MODEL: ${{ inputs.model }}
+        MAX_COMMENTS: ${{ inputs.max-comments }}
+        MAX_DIFF_BYTES: ${{ inputs.max-diff-bytes }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+        HEAD_SHA: ${{ inputs.head-sha }}
+        REPO_DIR: ${{ inputs.repo-dir }}
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: node "$GITHUB_ACTION_PATH/scripts/review.mjs"

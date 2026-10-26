@@ -1,0 +1,84 @@
+name: Claude PR review
+
+on:
+  workflow_call:
+    inputs:
+      model:
+        type: string
+        default: claude-opus-5-5
+      max-comments:
+        type: number
+        default: 15
+      max-diff-bytes:
+        type: number
+        default: 400000
+      pr-number:
+        description: Pull request number for a manual rerun from workflow_dispatch
+        type: string
+        default: ''
+    secrets:
+      ANTHROPIC_API_KEY:
+        required: false
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.pull_request.draft == false && github.event.pull_request.user.type != 'Bot')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: claude-review-${{ github.repository }}-${{ github.event.pull_request.number || inputs.pr-number }}
+      cancel-in-progress: false
+    steps:
+      - name: Resolve pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr-number }}
+        run: |
+          if [ -z "$PR_NUMBER" ]; then
+            echo "Brak numeru PR"
+            exit 1
+          fi
+          head_repo=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq '.head.repo.full_name // ""')
+          head_sha=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq '.head.sha')
+          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "head-sha=$head_sha" >> "$GITHUB_OUTPUT"
+          if [ "$head_repo" != "$GITHUB_REPOSITORY" ]; then
+            echo "Przegląd Claude pominięty: PR z forka nie dostaje sekretów"
+            echo "fork=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "fork=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out pull request head
+        if: steps.pr.outputs.fork == 'false'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.head-sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node
+        if: steps.pr.outputs.fork == 'false'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Review with Claude
+        if: steps.pr.outputs.fork == 'false'
+        uses: kamilszczepanik/claude-pr-reviewer@v1
+        with:
+          model: ${{ inputs.model }}
+          max-comments: ${{ inputs.max-comments }}
+          max-diff-bytes: ${{ inputs.max-diff-bytes }}
+          pr-number: ${{ steps.pr.outputs.number }}
+          head-sha: ${{ steps.pr.outputs.head-sha }}
+          repo-dir: ${{ github.workspace }}
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github-token: ${{ github.token }}
