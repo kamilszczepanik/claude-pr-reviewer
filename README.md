@@ -24,12 +24,17 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number || inputs.pr-number }}
+  cancel-in-progress: false
+
 jobs:
   review:
+    if: github.event_name == 'workflow_dispatch' || (!github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository)
     permissions:
       contents: read
       pull-requests: write
-    uses: kamilszczepanik/claude-pr-reviewer/.github/workflows/review.yml@v1
+    uses: kamilszczepanik/claude-pr-reviewer/.github/workflows/review.yml@794dfb62ff44b703a756b854a39de03e369caa44
     with:
       pr-number: ${{ inputs.pr-number }}
     secrets:
@@ -37,7 +42,24 @@ jobs:
 ```
 
 Uprawnienie `pull-requests: write` dostaje tylko ta jedna praca; poziom workflowu zostaje przy `contents: read`, żeby
-dopisana później praca go nie odziedziczyła.
+dopisana później praca go nie odziedziczyła. Warunek `if` pomija szkice (przegląd przychodzi przy „Ready for review”)
+i PR-y z forków, które nie dostają sekretów; `concurrency` szereguje przebiegi jednego PR-a.
+
+Model: domyślnie `claude-sonnet-5-5` (przegląd typowego PR-a około 0,15 USD). Głębszy przegląd: `model: claude-opus-5-5`
+w `with:`.
+
+## Przypięcie
+
+Wołający przypina pełny SHA commita, nie tag: praca dostaje `ANTHROPIC_API_KEY` i token z `pull-requests: write`, więc
+kod pod przypięciem nie może się zmienić bez śladu w wołającym repo. Ekosystem `github-actions` w `dependabot.yml`
+wołającego podbija SHA przy nowym wydaniu.
+
+| Wersja   | SHA                                        |
+| -------- | ------------------------------------------ |
+| `v1.1.1` | `794dfb62ff44b703a756b854a39de03e369caa44` |
+| `v1.1.0` | `9ad909a21e759e6ae14e607beafb2d2297c1ac1a` |
+
+Wołający: `asystent`, `platero-ai`, `dg-cars`.
 
 ## Kontrakt
 
@@ -104,8 +126,6 @@ pominięciu. Nie wypycha commitów, nie zmienia etykiet, nie zamyka wątków.
 - `ready_for_review` uruchamia przegląd przy każdym przejściu ze szkicu do gotowego, a `concurrency` tylko
   szereguje przebiegi, nie usuwa powtórzeń: każde przełączenie to nowy płatny przegląd. Sufitem jest
   `max-budget-usd` na przebieg i limit wydatków workspace'u.
-- `@v1` to tag ruchomy, a praca dostaje `ANTHROPIC_API_KEY`. Repo jest prywatne i tylko właściciel przesuwa tag;
-  gdy klucz dostanie wyższy limit, wołający przypina workflow do SHA commita.
 - Hak granicy repozytorium warto potwierdzić na żywo: pierwszy przegląd testowy pokazuje w logu „odmowy narzędzi 0”
   na zwykłym PR-ze.
 
@@ -135,8 +155,8 @@ ręczne ponowienie przeglądu na dowolnym PR-ze, dopiero potem wyłączenie star
 
 ## Tagi i wydanie
 
-`v1` to tag ruchomy w obrębie wersji głównej: wołające repozytoria przypinają `@v1` i dostają poprawki bez zmian
-u siebie. Każde wydanie dostaje też stały tag `v1.x.y`. Zmiana niezgodna wstecz (wejścia, sekrety, uprawnienia) to
+`v1` to tag ruchomy w obrębie wersji głównej, a każde wydanie dostaje stały tag `v1.x.y`. Wołające repozytoria
+przypinają SHA (sekcja „Przypięcie”), więc nowe wydanie dociera do nich PR-em Dependabota albo ręczną zmianą SHA. Zmiana niezgodna wstecz (wejścia, sekrety, uprawnienia) to
 `v2`. Wydanie:
 
 1. Podnieś `version` w `package.json` (i `package-lock.json`) oraz tag akcji w `.github/workflows/review.yml`
@@ -144,6 +164,7 @@ u siebie. Każde wydanie dostaje też stały tag `v1.x.y`. Zmiana niezgodna wste
 2. Commit, potem utwórz i wyślij na origin stały tag `v1.x.y`, a dopiero po nim przesuń `v1` na ten sam commit
    (`git tag -f v1` i wysłanie z `-f`). Kolejność ma znaczenie: `v1` przesunięty przed stałym tagiem wskazywałby
    akcję pod tagiem, którego jeszcze nie ma.
+3. Dopisz wiersz do tabeli w „Przypięcie”.
 
 ## Rozwój
 
