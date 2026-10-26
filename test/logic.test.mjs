@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { rightLinesByPath, truncateDiff } from "../scripts/lib/diff.mjs";
+import { skipReasonFor } from "../scripts/lib/failure.mjs";
 import { parseReview, selectComments } from "../scripts/lib/review-result.mjs";
 
 const fileDiff = ({ path, hunk }) =>
@@ -129,4 +130,24 @@ describe("selectComments", () => {
     assert.equal(droppedOutsideDiff, 2);
     assert.equal(droppedOverCap, 1);
   });
+});
+
+describe("skipReasonFor", () => {
+  const cases = [
+    { failure: { status: 402 }, reason: "wyczerpany kredyt API Anthropic" },
+    { failure: { status: 400, message: "Your credit balance is too low" }, reason: "wyczerpany kredyt API Anthropic" },
+    { failure: { status: 429 }, reason: "limit zapytań albo wydatków workspace" },
+    { failure: { status: 401 }, reason: "klucz API odrzucony (401)" },
+    { failure: { status: 404 }, reason: "API Anthropic odrzuciło żądanie (404)" },
+    { failure: { status: 529 }, reason: "API Anthropic niedostępne (529)" },
+    { failure: { message: "API Error: Connection error." }, reason: "błąd sieci" },
+    { failure: { message: "fetch failed: ETIMEDOUT" }, reason: "błąd sieci" },
+    { failure: { message: "Unexpected token in JSON" }, reason: null },
+    { failure: { status: null, message: "" }, reason: null },
+  ];
+  for (const { failure, reason } of cases) {
+    it(`maps ${JSON.stringify(failure)} to ${reason}`, () => {
+      assert.equal(skipReasonFor(failure), reason);
+    });
+  }
 });
