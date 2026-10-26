@@ -12,6 +12,10 @@ on:
       max-diff-bytes:
         type: number
         default: 400000
+      max-budget-usd:
+        description: Hard cost cap of one review in USD; the run is skipped, not failed, when it is reached
+        type: number
+        default: 5
       pr-number:
         description: Pull request number for a manual rerun from workflow_dispatch
         type: string
@@ -22,10 +26,12 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   review:
+    permissions:
+      contents: read
+      pull-requests: write
     if: >-
       github.event_name != 'pull_request' ||
       (github.event.pull_request.draft == false && github.event.pull_request.user.type != 'Bot')
@@ -41,12 +47,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr-number }}
         run: |
-          if [ -z "$PR_NUMBER" ]; then
-            echo "Brak numeru PR"
-            exit 1
-          fi
-          head_repo=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq '.head.repo.full_name // ""')
-          head_sha=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq '.head.sha')
+          case "$PR_NUMBER" in
+            '' | *[!0-9]*)
+              echo "Numer PR musi być liczbą"
+              exit 1
+              ;;
+          esac
+          pr=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq '[(.head.repo.full_name // ""), .head.sha] | @tsv')
+          head_repo=$(printf '%s' "$pr" | cut -f1)
+          head_sha=$(printf '%s' "$pr" | cut -f2)
           echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
           echo "head-sha=$head_sha" >> "$GITHUB_OUTPUT"
           if [ "$head_repo" != "$GITHUB_REPOSITORY" ]; then
@@ -72,11 +81,12 @@ jobs:
 
       - name: Review with Claude
         if: steps.pr.outputs.fork == 'false'
-        uses: kamilszczepanik/claude-pr-reviewer@v1
+        uses: kamilszczepanik/claude-pr-reviewer@v1.1.0
         with:
           model: ${{ inputs.model }}
           max-comments: ${{ inputs.max-comments }}
           max-diff-bytes: ${{ inputs.max-diff-bytes }}
+          max-budget-usd: ${{ inputs.max-budget-usd }}
           pr-number: ${{ steps.pr.outputs.number }}
           head-sha: ${{ steps.pr.outputs.head-sha }}
           repo-dir: ${{ github.workspace }}

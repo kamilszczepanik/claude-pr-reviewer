@@ -10,6 +10,10 @@ inputs:
   max-diff-bytes:
     description: Diff size sent to the model, cut at file boundaries
     required: true
+  max-budget-usd:
+    description: Hard cost cap of one review in USD
+    required: false
+    default: '5'
   pr-number:
     description: Pull request number
     required: true
@@ -38,6 +42,7 @@ runs:
         REVIEW_MODEL: ${{ inputs.model }}
         MAX_COMMENTS: ${{ inputs.max-comments }}
         MAX_DIFF_BYTES: ${{ inputs.max-diff-bytes }}
+        MAX_BUDGET_USD: ${{ inputs.max-budget-usd }}
         PR_NUMBER: ${{ inputs.pr-number }}
         HEAD_SHA: ${{ inputs.head-sha }}
         REPO_DIR: ${{ inputs.repo-dir }}
