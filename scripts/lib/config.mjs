@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 
-const DEFAULT_MODEL = 'claude-opus-5-5';
+const DEFAULT_MODEL = 'claude-sonnet-5-5';
 const DEFAULT_MAX_COMMENTS = 15;
 const DEFAULT_MAX_DIFF_BYTES = 400_000;
 const DEFAULT_MAX_BUDGET_USD = 5;

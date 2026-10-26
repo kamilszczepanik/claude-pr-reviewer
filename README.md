@@ -45,7 +45,7 @@ Wejścia (`workflow_call`), wszystkie opcjonalne:
 
 | Wejście          | Typ    | Domyślnie         | Znaczenie                                                                       |
 | ---------------- | ------ | ----------------- | ------------------------------------------------------------------------------- |
-| `model`          | string | `claude-opus-5-5` | identyfikator modelu                                                            |
+| `model`          | string | `claude-sonnet-5-5` | identyfikator modelu                                                            |
 | `max-comments`   | number | 15                | najwięcej uwag w linii; reszta jest liczona w podsumowaniu                      |
 | `max-diff-bytes` | number | 400000            | rozmiar diffu dla modelu, cięty na granicy pliku                                |
 | `max-budget-usd` | number | 5                 | twardy sufit kosztu jednego przeglądu; po przekroczeniu przegląd jest pominięty |
