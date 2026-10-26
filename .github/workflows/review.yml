@@ -81,7 +81,7 @@ jobs:
 
       - name: Review with Claude
         if: steps.pr.outputs.fork == 'false'
-        uses: kamilszczepanik/claude-pr-reviewer@v1.1.1
+        uses: kamilszczepanik/claude-pr-reviewer@v1.2.0
         with:
           model: ${{ inputs.model }}
           max-comments: ${{ inputs.max-comments }}
