@@ -38,8 +38,10 @@ const reviewPullRequest = async ({ config, github }) => {
   const headSha = config.headSha ?? pullRequest.head.sha;
   const fullDiff = await fetchDiff({ github, baseSha: pullRequest.base.sha, headSha });
   const { diff, omittedFiles } = truncateDiff({ diff: fullDiff, maxBytes: config.maxDiffBytes });
-  const rubric = await readRubric(config.repoDir);
-  log(`Przegląd PR #${config.prNumber}: diff ${Buffer.byteLength(diff)} B, pominięte pliki ${omittedFiles.length}`);
+  const rubric = await readRubric({ repoDir: config.repoDir, baseSha: pullRequest.base.sha });
+  log(
+    `Przegląd PR #${config.prNumber}: diff ${Buffer.byteLength(diff)} B, pominięte pliki ${omittedFiles.length}, rubryka z ${rubric.source}`,
+  );
   const { review, turns, tokens, costUsd, denials } = await runAgentReview({
     model: config.model,
     maxBudgetUsd: config.maxBudgetUsd,
@@ -48,7 +50,7 @@ const reviewPullRequest = async ({ config, github }) => {
     prompt: buildPrompt({
       title: pullRequest.title,
       description: pullRequest.body,
-      rubric,
+      rubric: rubric.text,
       diff,
       omittedFiles,
       maxComments: config.maxComments,
