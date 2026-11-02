@@ -2,7 +2,7 @@
 
 Wspólny przegląd pull requestów przez Claude na kredycie API (Agent SDK, nie Claude Code GitHub Action, bo kredyt
 API nie pokrywa Claude Code). Każdy PR dostaje po otwarciu albo po „Ready for review” jeden przegląd: komentarze
-w linii i krótkie podsumowanie z linią stanu (model, tury, tokeny, ewentualne obcięcie diffu).
+w linii i krótkie podsumowanie z linią stanu (trasa, model, tury, tokeny, ewentualne obcięcie diffu).
 
 ## Jak wołać
 
@@ -39,7 +39,10 @@ jobs:
       pr-number: ${{ inputs.pr-number }}
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
 ```
+
+Sekret `AI_GATEWAY_API_KEY` jest opcjonalny: bez niego przegląd idzie tylko kredytem API (sekcja „Trasa zapasowa: bramka AI”).
 
 Uprawnienie `pull-requests: write` dostaje tylko ta jedna praca; poziom workflowu zostaje przy `contents: read`, żeby
 dopisana później praca go nie odziedziczyła. Warunek `if` pomija szkice (przegląd przychodzi przy „Ready for review”)
@@ -74,9 +77,10 @@ Wejścia (`workflow_call`), wszystkie opcjonalne:
 | `max-diff-bytes` | number | 150000              | rozmiar diffu dla modelu, cięty na granicy pliku, najmniejsze pliki pierwsze    |
 | `max-budget-usd` | number | 2                   | twardy sufit kosztu jednego przeglądu; po przekroczeniu przegląd jest pominięty |
 | `pr-number`      | string | puste               | numer PR przy ręcznym ponowieniu; tylko cyfry, inaczej praca kończy się błędem  |
+| `gateway-model`  | string | `anthropic/claude-sonnet-5.5` | identyfikator modelu na trasie bramki AI                              |
 
-Sekret: `ANTHROPIC_API_KEY`, opcjonalny. Wołający przekazuje go jawnie (nie `secrets: inherit`). Bez niego przegląd
-jest pominięty z komentarzem, bez czerwonego checka. Klucz trafia wyłącznie do procesu Agent SDK (biała lista
+Sekrety: `ANTHROPIC_API_KEY` i `AI_GATEWAY_API_KEY`, oba opcjonalne. Wołający przekazuje je jawnie (nie
+`secrets: inherit`). Bez obu przegląd jest pominięty z komentarzem, bez czerwonego checka. Klucz trafia wyłącznie do procesu Agent SDK (biała lista
 zmiennych środowiska: klucz, `PATH`, `HOME`, locale, katalog tymczasowy, proxy); `GITHUB_TOKEN` zostaje w procesie
 skryptu i nie trafia do modelu. Ani klucz, ani token, ani ich zapis base64, ani nic, co wygląda jak klucz Anthropic
 albo token GitHuba, nie przechodzi do publikowanego tekstu i do logu.
@@ -115,15 +119,18 @@ pominięciu. Nie wypycha commitów, nie zmienia etykiet, nie zamyka wątków.
   i definicje odnośników usunięte, HTML zneutralizowany, odnośniki pokazane z adresem, długość ucięta (podsumowanie
   3000 znaków, uwaga 4000, całość poniżej limitu GitHuba). Publikacja w trzech krokach: recenzja z uwagami w linii,
   przy 422 recenzja z listą uwag w treści, przy kolejnym 422 samo krótkie podsumowanie.
-- Pominięcie z oczekiwanego powodu nie daje czerwonego checka: wyczerpany kredyt (402), limit zapytań (429), odrzucony
-  klucz (401, 403), niedostępne API Anthropic (5xx), błąd sieci, limit czasu, budżet, limit tur, niedostępne API
-  GitHuba i brak sekretu. Jest jedna linia w logu, komentarz o pominięciu i kod 0. Niewyjaśniona odmowa API
-  (każdy inny 4xx, np. 400, 404, 413, 422) daje ten sam komentarz, ale kod 1 i czerwony check, bo zwykle znaczy
-  błąd w żądaniu, który trzeba naprawić. Gdy nie da się dodać nawet komentarza, zostaje druga linia w logu, a kod
+- Pominięcie z oczekiwanego powodu nie daje czerwonego checka: wyczerpany kredyt (402) albo limit użycia, limit
+  zapytań (429), odrzucony klucz (401, 403), niedostępne API Anthropic (5xx), błąd sieci, limit czasu, budżet, limit
+  tur, niedostępne API GitHuba i brak sekretów. Na trasie bramki AI to samo dotyczy wyczerpanego budżetu klucza
+  bramki (402), limitu zapytań bramki (429), odrzuconego klucza bramki (401, 403) i niedostępnej bramki (5xx).
+  Gdy bramka była próbowana, komentarz podaje oba powody: „<powód>; bramka AI: <powód bramki>”, a bez jej klucza
+  „<powód>; bramka AI nieskonfigurowana (brak sekretu AI_GATEWAY_API_KEY)”. Jest jedna linia w logu, komentarz
+  o pominięciu i kod 0. Niewyjaśniona odmowa API albo bramki (każdy inny 4xx, np. 400, 404, 413, 422) daje ten sam
+  komentarz, ale kod 1 i czerwony check, bo zwykle znaczy błąd w żądaniu, który trzeba naprawić. Gdy nie da się dodać nawet komentarza, zostaje druga linia w logu, a kod
   się nie zmienia. Błąd własnego kodu albo zły JSON wyniku kończy się kodem 1, a log podaje rodzaj błędu bez treści
   odpowiedzi modelu.
-- Log to kilka linii na przebieg: rozmiar diffu, źródło rubryki, liczba uwag, tury, tokeny, koszt, liczba odmów
-  narzędzi. Przy pominięciu przez API linia podaje też tekst błędu API, z wyciętymi sekretami i uciętą do 300 znaków;
+- Log to kilka linii na przebieg: rozmiar diffu, źródło rubryki, liczba uwag, trasa, model, tury, tokeny, koszt
+  (albo „koszt nieznany”, gdy bramka nie poda kosztu), liczba odmów narzędzi. Przy pominięciu przez API linia podaje też tekst błędu API, z wyciętymi sekretami i uciętą do 300 znaków;
   do komentarza na PR-ze on nie trafia. Klucz, prompt i odpowiedzi modelu nigdy do niego nie trafiają.
 
 ## Ograniczenia i świadome wybory
@@ -153,8 +160,28 @@ Każde uruchomienie to nowy przegląd i nowy koszt.
 
 Płaci kredyt API z org „Kamil's Individual Org”, workspace `ci-review` z własnym limitem wydatków: 200 USD
 miesięcznie w planie Max, odnawia się 26. dnia miesiąca, niewykorzystany przepada, a po wyczerpaniu żądania stają do
-odnowienia (twardy stop, bez karty i bez auto-reload). Przegląd przy wyczerpanym kredycie zostawia komentarz
-„pominięty” zamiast czerwonego checka.
+odnowienia (twardy stop, bez karty i bez auto-reload). Przy wyczerpanym kredycie przegląd idzie bramką AI, gdy jest
+jej klucz; bez klucza zostaje komentarz „pominięty” zamiast czerwonego checka.
+
+## Trasa zapasowa: bramka AI
+
+Gdy trasa kredytu API odpowie wyczerpanym kredytem (402, tekst o kredycie albo rozliczeniu) albo wyczerpanym limitem
+użycia (`usage limit` przy 400 lub 429), recenzent raz ponawia cały przegląd od zera przez Vercel AI Gateway. Przy
+401, 403, zwykłym 429, 5xx, błędzie sieci, limicie czasu, budżecie i limicie tur ponowienia nie ma. Bez
+`ANTHROPIC_API_KEY`, a z kluczem bramki, przegląd idzie od razu bramką. Bramka nie ma trasy dalej.
+
+Na trasie bramki proces Agent SDK dostaje `ANTHROPIC_BASE_URL=https://ai-gateway.vercel.sh/claude-code` (bez `/v1`),
+`ANTHROPIC_AUTH_TOKEN` z kluczem bramki i pusty `ANTHROPIC_API_KEY`; trasa kredytu API tych zmiennych nie dostaje.
+Model wybiera wejście `gateway-model`, domyślnie `anthropic/claude-sonnet-5.5`. Linia stanu recenzji mówi wtedy
+„trasa: bramka AI”, a log zapisuje powód przełączenia („Trasa kredyt API: <powód>; ponawiam przez bramkę AI”).
+
+Koszt przeglądu bramką to około 0,05–0,15 USD; `max-budget-usd` i limit tur obowiązują jak na kredycie API. Twardym
+limitem jest budżet klucza bramki (20 USD miesięcznie), a jego wyczerpanie (402) daje pominięcie bez czerwonego
+checka. Obrót klucza: nowy klucz w panelu AI Gateway, podmiana sekretu w każdym repozytorium
+(`gh secret set AI_GATEWAY_API_KEY --repo <owner>/<repo>`), dopiero potem wyłączenie starego.
+
+Retencja: na tej trasie diff idzie przez Vercel do Anthropic bez przypięcia regionu i bez zerowej retencji, na co się
+godzimy, bo kod nie niesie danych osobowych.
 
 ## Klucz API
 
@@ -183,4 +210,5 @@ przypinają SHA (sekcja „Przypięcie”), więc nowe wydanie dociera do nich P
 
 Node 22, czysty ESM, zależności przypięte do dokładnych wersji. `npm test` uruchamia `node --test` na czystej logice:
 mapowanie linii diffu, obcinanie, walidacja wyniku, wybór komunikatu przy błędzie API, sanityzacja i limity długości,
-publikacja z cofaniem po 422, wyjście 0 przy pominięciu, granica repozytorium, rubryka z bazy, zgodność wersji akcji.
+publikacja z cofaniem po 422, wyjście 0 przy pominięciu, granica repozytorium, rubryka z bazy, zgodność wersji akcji,
+wybór trasy i ponowienie przez bramkę, stronicowanie komentarzy.

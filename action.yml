@@ -27,6 +27,14 @@ inputs:
     description: Anthropic API key
     required: false
     default: ''
+  ai-gateway-api-key:
+    description: Vercel AI Gateway key, used when the Anthropic API credit or usage limit is exhausted
+    required: false
+    default: ''
+  gateway-model:
+    description: Model id on the AI Gateway route
+    required: false
+    default: anthropic/claude-sonnet-5.5
   github-token:
     description: Token with pull-requests write
     required: true
@@ -47,5 +55,7 @@ runs:
         HEAD_SHA: ${{ inputs.head-sha }}
         REPO_DIR: ${{ inputs.repo-dir }}
         ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        AI_GATEWAY_API_KEY: ${{ inputs.ai-gateway-api-key }}
+        GATEWAY_MODEL: ${{ inputs.gateway-model }}
         GH_TOKEN: ${{ inputs.github-token }}
       run: node "$GITHUB_ACTION_PATH/scripts/review.mjs"
