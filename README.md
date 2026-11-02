@@ -112,7 +112,8 @@ pominięciu. Nie wypycha commitów, nie zmienia etykiet, nie zamyka wątków.
   „rubryka z head”.
 - Agent SDK: średni wysiłek, narzędzia `Read`, `Grep`, `Glob`, tryb `dontAsk`, bez ustawień z dysku
   (`settingSources: []`, więc hooki z PR-a się nie uruchamiają), limit 20 tur, `max-budget-usd`, limit czasu
-  15 minut, wynik jako JSON ze schematu. Tytuł, opis, rubryka i diff mają limity długości, a znaczniki danych w ich
+  pierwszej próby 15 minut, a ponowienie przez bramkę AI dostaje tylko czas, który zostaje ze wspólnych 18 minut,
+  wynik jako JSON ze schematu. Tytuł, opis, rubryka i diff mają limity długości, a znaczniki danych w ich
   treści są neutralizowane.
 - Wynik przechodzi walidację, uwagi spoza linii diffu odpadają, reszta jest cięta do `max-comments` według powagi.
   Tekst modelu przed publikacją: wycięte sekrety, `@wzmianki` rozbrojone znakiem zerowej szerokości, obrazy markdown
