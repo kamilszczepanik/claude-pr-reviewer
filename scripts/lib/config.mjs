@@ -5,6 +5,8 @@ const DEFAULT_MAX_COMMENTS = 15;
 const DEFAULT_MAX_DIFF_BYTES = 150_000;
 const DEFAULT_MAX_BUDGET_USD = 2;
 
+export const MAX_TURNS = 20;
+
 const positiveInt = (value, fallback) => {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
