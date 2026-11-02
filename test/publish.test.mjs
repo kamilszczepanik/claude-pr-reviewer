@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 
 import { apiSkipError, skipError } from '../scripts/lib/failure.mjs';
 import { publishReview, settleReview, SKIP_MARKER } from '../scripts/lib/publish.mjs';
-import { buildReviewBody, cleanReview, GITHUB_BODY_LIMIT } from '../scripts/lib/review-body.mjs';
+import { buildReviewBody, buildShortBody, cleanReview, GITHUB_BODY_LIMIT } from '../scripts/lib/review-body.mjs';
 
 const httpError = (status) => Object.assign(new Error(`GitHub ${status}`), { status });
 
@@ -149,6 +149,7 @@ describe('review body', () => {
     });
     const body = buildReviewBody({
       ...review,
+      route: 'api',
       model: 'claude-opus-5-5',
       turns: 40,
       tokens: { input: 1, output: 1 },
@@ -157,13 +158,29 @@ describe('review body', () => {
       fallbackComments: review.comments,
     });
     assert.ok(body.length <= GITHUB_BODY_LIMIT);
-    assert.match(body, /<sub>Przegląd Claude · model claude-opus-5-5/);
+    assert.match(body, /<sub>Przegląd Claude · trasa: kredyt API · model claude-opus-5-5/);
+  });
+
+  it('names the gateway route in the status line of the full and the short body', () => {
+    const input = {
+      summary: 'Podsumowanie.',
+      route: 'gateway',
+      model: 'anthropic/claude-sonnet-5.5',
+      turns: 2,
+      tokens: { input: 1, output: 1 },
+      omittedFiles: [],
+      droppedOverCap: 0,
+    };
+    for (const body of [buildReviewBody(input), buildShortBody(input)]) {
+      assert.ok(body.split('\n').at(-1).includes('trasa: bramka AI · model anthropic/claude-sonnet-5.5'));
+    }
   });
 
   it('escapes model paths in the fallback list like omitted files', () => {
     const fallbackBody = (comment) =>
       buildReviewBody({
         summary: 'Podsumowanie.',
+        route: 'api',
         model: 'claude-opus-5-5',
         turns: 1,
         tokens: { input: 1, output: 1 },

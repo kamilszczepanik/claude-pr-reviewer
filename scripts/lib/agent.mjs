@@ -4,6 +4,7 @@ import { reviewOutcome } from './agent-outcome.mjs';
 import { MAX_TURNS } from './config.mjs';
 import { apiSkipError, skipError } from './failure.mjs';
 import { REVIEW_JSON_SCHEMA } from './review-result.mjs';
+import { routeEnv } from './routes.mjs';
 import { createRepoGuard, GUARDED_TOOLS } from './tool-guard.mjs';
 
 const READ_ONLY_TOOLS = ['Read', 'Grep', 'Glob'];
@@ -35,7 +36,7 @@ const agentEnv = () =>
 
 const timeoutError = () => skipError(`przekroczony czas ${TIMEOUT_MINUTES} min`);
 
-const collectResult = async ({ model, cwd, systemPrompt, prompt, maxBudgetUsd, secrets, onDeny }) => {
+const collectResult = async ({ model, route, gatewayKey, cwd, systemPrompt, prompt, maxBudgetUsd, secrets, onDeny }) => {
   const abortController = new AbortController();
   const timer = setTimeout(() => abortController.abort(), TIMEOUT_MINUTES * 60_000);
   let result = null;
@@ -56,7 +57,7 @@ const collectResult = async ({ model, cwd, systemPrompt, prompt, maxBudgetUsd, s
         systemPrompt,
         outputFormat: { type: 'json_schema', schema: REVIEW_JSON_SCHEMA },
         hooks: { PreToolUse: [{ matcher: GUARDED_TOOLS, hooks: [createRepoGuard({ root: cwd, onDeny })] }] },
-        env: agentEnv(),
+        env: routeEnv({ route, baseEnv: agentEnv(), gatewayKey }),
       },
     })) {
       if (message.type === 'result') result = message;
@@ -64,7 +65,9 @@ const collectResult = async ({ model, cwd, systemPrompt, prompt, maxBudgetUsd, s
   } catch (error) {
     if (abortController.signal.aborted) throw timeoutError();
     if (result) return result;
-    throw apiSkipError({ status: error.status ?? null, message: String(error.message ?? ''), secrets }) ?? error;
+    throw (
+      apiSkipError({ status: error.status ?? null, message: String(error.message ?? ''), secrets, route }) ?? error
+    );
   } finally {
     clearTimeout(timer);
   }
@@ -76,5 +79,11 @@ const collectResult = async ({ model, cwd, systemPrompt, prompt, maxBudgetUsd, s
 export const runAgentReview = async (request) => {
   let guardDenials = 0;
   const result = await collectResult({ ...request, onDeny: () => (guardDenials += 1) });
-  return reviewOutcome({ result, maxBudgetUsd: request.maxBudgetUsd, guardDenials, secrets: request.secrets });
+  return reviewOutcome({
+    result,
+    maxBudgetUsd: request.maxBudgetUsd,
+    guardDenials,
+    secrets: request.secrets,
+    route: request.route,
+  });
 };
