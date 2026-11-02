@@ -34,7 +34,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: kamilszczepanik/claude-pr-reviewer/.github/workflows/review.yml@ba77aed05eb571e266c481bc044291f0ad0bfd14
+    uses: kamilszczepanik/claude-pr-reviewer/.github/workflows/review.yml@725b78491692931764120191d62166f253e470a6
     with:
       pr-number: ${{ inputs.pr-number }}
     secrets:
@@ -56,6 +56,7 @@ wołającego podbija SHA przy nowym wydaniu.
 
 | Wersja   | SHA                                        |
 | -------- | ------------------------------------------ |
+| `v1.3.0` | `725b78491692931764120191d62166f253e470a6` |
 | `v1.2.0` | `ba77aed05eb571e266c481bc044291f0ad0bfd14` |
 | `v1.1.1` | `794dfb62ff44b703a756b854a39de03e369caa44` |
 | `v1.1.0` | `9ad909a21e759e6ae14e607beafb2d2297c1ac1a` |
