@@ -18,8 +18,11 @@ export const publishReview = async ({ github, attempts }) => {
 
 const isOwnSkipComment = (comment) => comment.user?.type === 'Bot' && comment.body?.startsWith(SKIP_MARKER);
 
-const reportSkip = async ({ github, reason, log }) => {
-  log(`Przegląd Claude pominięty: ${reason}`);
+const skipLine = ({ reason, detail }) =>
+  `Przegląd Claude pominięty: ${reason}${detail ? `; odpowiedź API: ${detail}` : ''}`.slice(0, MAX_LOG_CHARS);
+
+const reportSkip = async ({ github, reason, detail, log }) => {
+  log(skipLine({ reason, detail }));
   const body = `${SKIP_MARKER}\nPrzegląd Claude pominięty: ${reason}.\n\nTen przebieg nie sprawdził PR-a i nie zostawił żadnych uwag, więc nie traktuj go jako przeglądu bez uwag. Uruchom przegląd ponownie albo sprawdź zmiany ręcznie.`;
   try {
     const existing = (await github.listComments()).find(isOwnSkipComment);
@@ -44,7 +47,7 @@ export const settleReview = async ({ run, github, log }) => {
       log(failureLine(error));
       return 1;
     }
-    await reportSkip({ github, reason: error.skipReason, log });
-    return 0;
+    await reportSkip({ github, reason: error.skipReason, detail: error.skipDetail, log });
+    return error.failsCheck ? 1 : 0;
   }
 };

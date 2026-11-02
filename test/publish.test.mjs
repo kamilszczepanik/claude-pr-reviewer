@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { skipError } from '../scripts/lib/failure.mjs';
+import { apiSkipError, skipError } from '../scripts/lib/failure.mjs';
 import { publishReview, settleReview, SKIP_MARKER } from '../scripts/lib/publish.mjs';
 import { buildReviewBody, cleanReview, GITHUB_BODY_LIMIT } from '../scripts/lib/review-body.mjs';
 
@@ -98,6 +98,21 @@ describe('settleReview', () => {
       assert.ok(lines.every((line) => !line.includes('tajny tekst modelu')));
     });
   }
+
+  it('exits 1 after an unexplained API rejection and keeps the API text out of the PR', async () => {
+    const github = fakeGithub();
+    const lines = [];
+    const run = async () => Promise.reject(apiSkipError({ status: 400, message: 'prompt is too long' }));
+    assert.equal(await settleReview({ run, github, log: (line) => lines.push(line) }), 1);
+    assert.equal(github.calls.posted.length, 1);
+    const [comment] = github.calls.posted;
+    assert.ok(comment.startsWith(SKIP_MARKER));
+    assert.ok(comment.includes('odrzuciło żądanie (400)'));
+    assert.ok(!comment.includes('prompt is too long'));
+    assert.equal(lines.length, 1);
+    assert.ok(lines[0].includes('odpowiedź API: prompt is too long'));
+    assert.ok(lines[0].length <= 300);
+  });
 });
 
 describe('review body', () => {
