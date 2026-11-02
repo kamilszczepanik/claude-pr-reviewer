@@ -112,6 +112,11 @@ describe('settleReview', () => {
     assert.equal(lines.length, 1);
     assert.ok(lines[0].includes('odpowiedź API: prompt is too long'));
     assert.ok(lines[0].length <= 300);
+    const failedLines = [];
+    const failedComment = fakeGithub({ commentFailure: 403 });
+    assert.equal(await settleReview({ run, github: failedComment, log: (line) => failedLines.push(line) }), 1);
+    assert.equal(failedLines.length, 2);
+    assert.ok(!failedLines[1].includes('bez błędu') && failedLines[1].includes('kodem 1'));
   });
 });
 

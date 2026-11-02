@@ -22,7 +22,7 @@ const isOwnSkipComment = (comment) => comment.user?.type === 'Bot' && comment.bo
 const skipLine = ({ reason, detail }) =>
   `Przegląd Claude pominięty: ${reason}${detail ? `; odpowiedź API: ${detail}` : ''}`.slice(0, MAX_LOG_CHARS);
 
-const reportSkip = async ({ github, reason, detail, log }) => {
+const reportSkip = async ({ github, reason, detail, failsCheck, log }) => {
   log(skipLine({ reason, detail }));
   const body = `${SKIP_MARKER}\nPrzegląd Claude pominięty: ${reason}.\n\nTen przebieg nie sprawdził PR-a i nie zostawił żadnych uwag, więc nie traktuj go jako przeglądu bez uwag. Uruchom przegląd ponownie albo sprawdź zmiany ręcznie.`;
   try {
@@ -30,7 +30,9 @@ const reportSkip = async ({ github, reason, detail, log }) => {
     if (existing) await github.updateComment({ id: existing.id, body });
     else await github.postComment(body);
   } catch (error) {
-    log(`Komentarz o pominięciu nie powstał (${error.status ?? error.name}), kończę bez błędu`);
+    log(
+      `Komentarz o pominięciu nie powstał (${error.status ?? error.name}), ${failsCheck ? 'kończę kodem 1' : 'kończę bez błędu'}`,
+    );
   }
 };
 
@@ -48,7 +50,7 @@ export const settleReview = async ({ run, github, log }) => {
       log(failureLine(error));
       return 1;
     }
-    await reportSkip({ github, reason: error.skipReason, detail: error.skipDetail, log });
+    await reportSkip({ github, reason: error.skipReason, detail: error.skipDetail, failsCheck: error.failsCheck, log });
     return error.failsCheck ? 1 : 0;
   }
 };
