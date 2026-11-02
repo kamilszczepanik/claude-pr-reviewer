@@ -65,10 +65,11 @@ const reviewPullRequest = async ({ config, github }) => {
     route,
     config,
     log,
-    attempt: ({ route: used, model }) =>
+    attempt: ({ route: used, model, timeoutMs }) =>
       runAgentReview({
         model,
         route: used,
+        timeoutMs,
         gatewayKey: config.gatewayKey,
         maxBudgetUsd: config.maxBudgetUsd,
         secrets,

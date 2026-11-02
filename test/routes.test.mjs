@@ -50,6 +50,9 @@ describe('routeEnv', () => {
 describe('runRoutedReview', () => {
   const API_MODEL = 'claude-sonnet-5-5';
   const GATEWAY_MODEL = 'anthropic/claude-sonnet-5.5';
+  const MINUTE = 60_000;
+  const API_CALL = { route: 'api', model: API_MODEL, timeoutMs: 15 * MINUTE };
+  const GATEWAY_CALL = { route: 'gateway', model: GATEWAY_MODEL, timeoutMs: 15 * MINUTE };
   const SWITCH_LOG = 'Trasa kredyt API: wyczerpany kredyt API Anthropic; ponawiam przez bramkę AI';
   const credit = apiSkipError({ status: 400, message: 'Your credit balance is too low', secrets: [] });
   const apiRejected = apiSkipError({ status: 401, secrets: [] });
@@ -62,7 +65,7 @@ describe('runRoutedReview', () => {
       label: 'API success',
       route: 'api',
       outcomes: { api: done },
-      calls: [{ route: 'api', model: API_MODEL }],
+      calls: [API_CALL],
       returned: { ...done, route: 'api', model: API_MODEL },
       logs: [],
     },
@@ -70,10 +73,16 @@ describe('runRoutedReview', () => {
       label: 'API credit, gateway success',
       route: 'api',
       outcomes: { api: credit, gateway: done },
-      calls: [
-        { route: 'api', model: API_MODEL },
-        { route: 'gateway', model: GATEWAY_MODEL },
-      ],
+      calls: [API_CALL, GATEWAY_CALL],
+      returned: { ...done, route: 'gateway', model: GATEWAY_MODEL },
+      logs: [SWITCH_LOG],
+    },
+    {
+      label: 'API credit after 14 minutes, gateway gets the 4 left of 18',
+      route: 'api',
+      apiMinutes: 14,
+      outcomes: { api: credit, gateway: done },
+      calls: [API_CALL, { ...GATEWAY_CALL, timeoutMs: 4 * MINUTE }],
       returned: { ...done, route: 'gateway', model: GATEWAY_MODEL },
       logs: [SWITCH_LOG],
     },
@@ -82,7 +91,7 @@ describe('runRoutedReview', () => {
       route: 'api',
       gatewayKey: null,
       outcomes: { api: credit },
-      calls: [{ route: 'api', model: API_MODEL }],
+      calls: [API_CALL],
       thrown: {
         skipReason: 'wyczerpany kredyt API Anthropic; bramka AI nieskonfigurowana (brak sekretu AI_GATEWAY_API_KEY)',
         failsCheck: false,
@@ -94,7 +103,7 @@ describe('runRoutedReview', () => {
       label: 'API key rejected',
       route: 'api',
       outcomes: { api: apiRejected },
-      calls: [{ route: 'api', model: API_MODEL }],
+      calls: [API_CALL],
       same: apiRejected,
       logs: [],
     },
@@ -102,10 +111,7 @@ describe('runRoutedReview', () => {
       label: 'API credit, gateway budget',
       route: 'api',
       outcomes: { api: credit, gateway: budget },
-      calls: [
-        { route: 'api', model: API_MODEL },
-        { route: 'gateway', model: GATEWAY_MODEL },
-      ],
+      calls: [API_CALL, GATEWAY_CALL],
       thrown: {
         skipReason: 'wyczerpany kredyt API Anthropic; bramka AI: wyczerpany budżet klucza bramki AI',
         failsCheck: false,
@@ -117,10 +123,7 @@ describe('runRoutedReview', () => {
       label: 'API credit, gateway rejects',
       route: 'api',
       outcomes: { api: credit, gateway: gatewayRejected },
-      calls: [
-        { route: 'api', model: API_MODEL },
-        { route: 'gateway', model: GATEWAY_MODEL },
-      ],
+      calls: [API_CALL, GATEWAY_CALL],
       thrown: {
         skipReason: 'wyczerpany kredyt API Anthropic; bramka AI: odrzuciła żądanie (400)',
         failsCheck: true,
@@ -132,10 +135,7 @@ describe('runRoutedReview', () => {
       label: 'API credit, gateway crash',
       route: 'api',
       outcomes: { api: credit, gateway: crash },
-      calls: [
-        { route: 'api', model: API_MODEL },
-        { route: 'gateway', model: GATEWAY_MODEL },
-      ],
+      calls: [API_CALL, GATEWAY_CALL],
       same: crash,
       logs: [SWITCH_LOG],
     },
@@ -143,23 +143,26 @@ describe('runRoutedReview', () => {
       label: 'gateway first, gateway budget',
       route: 'gateway',
       outcomes: { gateway: budget },
-      calls: [{ route: 'gateway', model: GATEWAY_MODEL }],
+      calls: [GATEWAY_CALL],
       same: budget,
       logs: [],
     },
   ];
-  for (const { label, route, gatewayKey = 'vck', outcomes, calls, returned, thrown, same, logs } of cases) {
+  for (const row of cases) {
+    const { label, route, gatewayKey = 'vck', apiMinutes = 0, outcomes, calls, returned, thrown, same, logs } = row;
     it(`retries once through the gateway only after an exhausted API credit: ${label}`, async () => {
       const seen = [];
       const lines = [];
+      let clock = 0;
       const attempt = async (call) => {
         seen.push(call);
+        if (call.route === 'api') clock = apiMinutes * MINUTE;
         const outcome = outcomes[call.route];
         if (outcome instanceof Error) throw outcome;
         return outcome;
       };
       const config = { model: API_MODEL, gatewayModel: GATEWAY_MODEL, gatewayKey };
-      const run = runRoutedReview({ route, config, attempt, log: (line) => lines.push(line) });
+      const run = runRoutedReview({ route, config, attempt, log: (line) => lines.push(line), now: () => clock });
       if (returned) assert.deepEqual(await run, returned);
       if (same) await assert.rejects(run, (error) => error === same);
       if (thrown) {

@@ -8,7 +8,6 @@ import { routeEnv } from './routes.mjs';
 import { createRepoGuard, GUARDED_TOOLS } from './tool-guard.mjs';
 
 const READ_ONLY_TOOLS = ['Read', 'Grep', 'Glob'];
-const TIMEOUT_MINUTES = 15;
 const PASSED_ENV = [
   'ANTHROPIC_API_KEY',
   'PATH',
@@ -34,11 +33,22 @@ const agentEnv = () =>
     PASSED_ENV.filter((name) => process.env[name] !== undefined).map((name) => [name, process.env[name]]),
   );
 
-const timeoutError = () => skipError(`przekroczony czas ${TIMEOUT_MINUTES} min`);
+const timeoutError = (timeoutMs) => skipError(`przekroczony czas ${Math.ceil(timeoutMs / 60_000)} min`);
 
-const collectResult = async ({ model, route, gatewayKey, cwd, systemPrompt, prompt, maxBudgetUsd, secrets, onDeny }) => {
+const collectResult = async ({
+  model,
+  route,
+  gatewayKey,
+  timeoutMs,
+  cwd,
+  systemPrompt,
+  prompt,
+  maxBudgetUsd,
+  secrets,
+  onDeny,
+}) => {
   const abortController = new AbortController();
-  const timer = setTimeout(() => abortController.abort(), TIMEOUT_MINUTES * 60_000);
+  const timer = setTimeout(() => abortController.abort(), timeoutMs);
   let result = null;
   try {
     for await (const message of query({
@@ -63,7 +73,7 @@ const collectResult = async ({ model, route, gatewayKey, cwd, systemPrompt, prom
       if (message.type === 'result') result = message;
     }
   } catch (error) {
-    if (abortController.signal.aborted) throw timeoutError();
+    if (abortController.signal.aborted) throw timeoutError(timeoutMs);
     if (result) return result;
     throw (
       apiSkipError({ status: error.status ?? null, message: String(error.message ?? ''), secrets, route }) ?? error
@@ -71,7 +81,7 @@ const collectResult = async ({ model, route, gatewayKey, cwd, systemPrompt, prom
   } finally {
     clearTimeout(timer);
   }
-  if (!result && abortController.signal.aborted) throw timeoutError();
+  if (!result && abortController.signal.aborted) throw timeoutError(timeoutMs);
   if (!result) throw new Error('Agent SDK nie zwrócił wyniku');
   return result;
 };
