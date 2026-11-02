@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { skipError } from '../scripts/lib/failure.mjs';
+import { apiSkipError, skipError } from '../scripts/lib/failure.mjs';
 import { publishReview, settleReview, SKIP_MARKER } from '../scripts/lib/publish.mjs';
 import { buildReviewBody, cleanReview, GITHUB_BODY_LIMIT } from '../scripts/lib/review-body.mjs';
 
@@ -98,6 +98,26 @@ describe('settleReview', () => {
       assert.ok(lines.every((line) => !line.includes('tajny tekst modelu')));
     });
   }
+
+  it('exits 1 after an unexplained API rejection and keeps the API text out of the PR', async () => {
+    const github = fakeGithub();
+    const lines = [];
+    const run = async () => Promise.reject(apiSkipError({ status: 400, message: 'prompt is too long', secrets: [] }));
+    assert.equal(await settleReview({ run, github, log: (line) => lines.push(line) }), 1);
+    assert.equal(github.calls.posted.length, 1);
+    const [comment] = github.calls.posted;
+    assert.ok(comment.startsWith(SKIP_MARKER));
+    assert.ok(comment.includes('odrzuciło żądanie (400)'));
+    assert.ok(!comment.includes('prompt is too long'));
+    assert.equal(lines.length, 1);
+    assert.ok(lines[0].includes('odpowiedź API: prompt is too long'));
+    assert.ok(lines[0].length <= 300);
+    const failedLines = [];
+    const failedComment = fakeGithub({ commentFailure: 403 });
+    assert.equal(await settleReview({ run, github: failedComment, log: (line) => failedLines.push(line) }), 1);
+    assert.equal(failedLines.length, 2);
+    assert.ok(!failedLines[1].includes('bez błędu') && failedLines[1].includes('kodem 1'));
+  });
 });
 
 describe('review body', () => {
@@ -138,5 +158,25 @@ describe('review body', () => {
     });
     assert.ok(body.length <= GITHUB_BODY_LIMIT);
     assert.match(body, /<sub>Przegląd Claude · model claude-opus-5-5/);
+  });
+
+  it('escapes model paths in the fallback list like omitted files', () => {
+    const fallbackBody = (comment) =>
+      buildReviewBody({
+        summary: 'Podsumowanie.',
+        model: 'claude-opus-5-5',
+        turns: 1,
+        tokens: { input: 1, output: 1 },
+        omittedFiles: [],
+        droppedOverCap: 0,
+        fallbackComments: [{ line: 3, severity: 'high', ...comment }],
+      });
+    const body = fallbackBody({ path: 'src/`a`<img src=x>@kamil.ts', body: 'b' });
+    assert.ok(body.includes('"src/'));
+    assert.ok(body.includes(':3 (wysoka): b'));
+    assert.ok(!body.includes('<img'));
+    assert.ok(body.includes('@\u200Bkamil'));
+    assert.ok(!body.includes('`src/'));
+    assert.ok(!fallbackBody({ path: 'src/`a.ts', body: 'x `<img src=y>`' }).includes('<img'));
   });
 });

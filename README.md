@@ -61,7 +61,7 @@ wołającego podbija SHA przy nowym wydaniu.
 | `v1.1.1` | `794dfb62ff44b703a756b854a39de03e369caa44` |
 | `v1.1.0` | `9ad909a21e759e6ae14e607beafb2d2297c1ac1a` |
 
-Wołający: `asystent`, `platero-ai`, `dg-cars`.
+Wołający: `asystent`, `platero-ai`, `dg-cars` i to repozytorium (`.github/workflows/claude-review.yml`, przegląd własnych PR-ów).
 
 ## Kontrakt
 
@@ -115,12 +115,16 @@ pominięciu. Nie wypycha commitów, nie zmienia etykiet, nie zamyka wątków.
   i definicje odnośników usunięte, HTML zneutralizowany, odnośniki pokazane z adresem, długość ucięta (podsumowanie
   3000 znaków, uwaga 4000, całość poniżej limitu GitHuba). Publikacja w trzech krokach: recenzja z uwagami w linii,
   przy 422 recenzja z listą uwag w treści, przy kolejnym 422 samo krótkie podsumowanie.
-- Odmowa API Anthropic (4xx, w tym 402 i 429), jego niedostępność, błąd sieci, limit czasu, budżet, limit tur,
-  niedostępne API GitHuba i brak sekretu nie dają czerwonego checka: jedna linia w logu, komentarz o pominięciu
-  i kod 0. Gdy nie da się dodać nawet tego komentarza, zostaje druga linia w logu i dalej kod 0. Błąd własnego kodu
-  albo zły JSON wyniku kończy się kodem 1, a log podaje rodzaj błędu bez treści odpowiedzi modelu.
+- Pominięcie z oczekiwanego powodu nie daje czerwonego checka: wyczerpany kredyt (402), limit zapytań (429), odrzucony
+  klucz (401, 403), niedostępne API Anthropic (5xx), błąd sieci, limit czasu, budżet, limit tur, niedostępne API
+  GitHuba i brak sekretu. Jest jedna linia w logu, komentarz o pominięciu i kod 0. Niewyjaśniona odmowa API
+  (każdy inny 4xx, np. 400, 404, 413, 422) daje ten sam komentarz, ale kod 1 i czerwony check, bo zwykle znaczy
+  błąd w żądaniu, który trzeba naprawić. Gdy nie da się dodać nawet komentarza, zostaje druga linia w logu, a kod
+  się nie zmienia. Błąd własnego kodu albo zły JSON wyniku kończy się kodem 1, a log podaje rodzaj błędu bez treści
+  odpowiedzi modelu.
 - Log to kilka linii na przebieg: rozmiar diffu, źródło rubryki, liczba uwag, tury, tokeny, koszt, liczba odmów
-  narzędzi. Klucz, prompt i odpowiedzi modelu nigdy do niego nie trafiają.
+  narzędzi. Przy pominięciu przez API linia podaje też tekst błędu API, z wyciętymi sekretami i uciętą do 300 znaków;
+  do komentarza na PR-ze on nie trafia. Klucz, prompt i odpowiedzi modelu nigdy do niego nie trafiają.
 
 ## Ograniczenia i świadome wybory
 
@@ -169,8 +173,11 @@ przypinają SHA (sekcja „Przypięcie”), więc nowe wydanie dociera do nich P
    (`uses: kamilszczepanik/claude-pr-reviewer@v1.x.y`); `npm test` pilnuje, że są równe.
 2. Commit, potem utwórz i wyślij na origin stały tag `v1.x.y`, a dopiero po nim przesuń `v1` na ten sam commit
    (`git tag -f v1` i wysłanie z `-f`). Kolejność ma znaczenie: `v1` przesunięty przed stałym tagiem wskazywałby
-   akcję pod tagiem, którego jeszcze nie ma.
+   akcję pod tagiem, którego jeszcze nie ma. To jedyny dopuszczony force-push w tym repozytorium: `v1` jest tagiem
+   ruchomym z definicji, a stałe tagi `v1.x.y` nigdy się nie przesuwają.
 3. Dopisz wiersz do tabeli w „Przypięcie”.
+4. Przegląd tego repozytorium (`claude-review.yml`) przypina SHA poprzedniego wydania, bo commit wydania nie może
+   zawierać własnego SHA; podbij go w tym samym PR-ze co wiersz tabeli z kroku 3.
 
 ## Rozwój
 

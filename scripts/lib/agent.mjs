@@ -1,8 +1,9 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 
+import { reviewOutcome } from './agent-outcome.mjs';
 import { MAX_TURNS } from './config.mjs';
-import { skipError, skipReasonFor } from './failure.mjs';
-import { parseReview, REVIEW_JSON_SCHEMA } from './review-result.mjs';
+import { apiSkipError, skipError } from './failure.mjs';
+import { REVIEW_JSON_SCHEMA } from './review-result.mjs';
 import { createRepoGuard, GUARDED_TOOLS } from './tool-guard.mjs';
 
 const READ_ONLY_TOOLS = ['Read', 'Grep', 'Glob'];
@@ -32,20 +33,9 @@ const agentEnv = () =>
     PASSED_ENV.filter((name) => process.env[name] !== undefined).map((name) => [name, process.env[name]]),
   );
 
-const sumTokens = (modelUsage = {}) =>
-  Object.values(modelUsage).reduce(
-    (total, usage) => ({
-      input: total.input + usage.inputTokens + usage.cacheReadInputTokens + usage.cacheCreationInputTokens,
-      output: total.output + usage.outputTokens,
-    }),
-    { input: 0, output: 0 },
-  );
-
-const failureText = (result) => (result.subtype === 'success' ? result.result : (result.errors ?? []).join(' '));
-
 const timeoutError = () => skipError(`przekroczony czas ${TIMEOUT_MINUTES} min`);
 
-const collectResult = async ({ model, cwd, systemPrompt, prompt, maxBudgetUsd, onDeny }) => {
+const collectResult = async ({ model, cwd, systemPrompt, prompt, maxBudgetUsd, secrets, onDeny }) => {
   const abortController = new AbortController();
   const timer = setTimeout(() => abortController.abort(), TIMEOUT_MINUTES * 60_000);
   let result = null;
@@ -74,8 +64,7 @@ const collectResult = async ({ model, cwd, systemPrompt, prompt, maxBudgetUsd, o
   } catch (error) {
     if (abortController.signal.aborted) throw timeoutError();
     if (result) return result;
-    const reason = skipReasonFor({ status: error.status ?? null, message: String(error.message ?? '') });
-    throw reason ? skipError(reason) : error;
+    throw apiSkipError({ status: error.status ?? null, message: String(error.message ?? ''), secrets }) ?? error;
   } finally {
     clearTimeout(timer);
   }
@@ -87,18 +76,5 @@ const collectResult = async ({ model, cwd, systemPrompt, prompt, maxBudgetUsd, o
 export const runAgentReview = async (request) => {
   let guardDenials = 0;
   const result = await collectResult({ ...request, onDeny: () => (guardDenials += 1) });
-  if (result.subtype === 'error_max_turns') throw skipError(`wyczerpany limit ${MAX_TURNS} tur`);
-  if (result.subtype === 'error_max_budget_usd') throw skipError(`przekroczony budżet ${request.maxBudgetUsd} USD`);
-  if (result.is_error) {
-    const reason = skipReasonFor({ status: result.api_error_status ?? null, message: failureText(result) });
-    if (reason) throw skipError(reason);
-  }
-  if (result.subtype !== 'success' || result.is_error) throw new Error(`Przegląd przerwany: ${result.subtype}`);
-  return {
-    review: parseReview(result.structured_output ?? result.result),
-    turns: result.num_turns,
-    tokens: sumTokens(result.modelUsage),
-    costUsd: result.total_cost_usd ?? 0,
-    denials: guardDenials + (result.permission_denials?.length ?? 0),
-  };
+  return reviewOutcome({ result, maxBudgetUsd: request.maxBudgetUsd, guardDenials, secrets: request.secrets });
 };
