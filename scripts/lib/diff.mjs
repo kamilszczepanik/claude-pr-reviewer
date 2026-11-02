@@ -66,19 +66,21 @@ export const splitDiffByFile = (diff) =>
     .filter((file) => file.path);
 
 export const truncateDiff = ({ diff, maxBytes }) => {
-  const kept = [];
-  const omittedFiles = [];
+  const files = splitDiffByFile(diff).map((file) => ({ ...file, bytes: Buffer.byteLength(file.text) }));
+  const kept = new Set();
   let usedBytes = 0;
-  for (const file of splitDiffByFile(diff)) {
-    const bytes = Buffer.byteLength(file.text);
-    if (usedBytes + bytes > maxBytes) {
-      omittedFiles.push(file.path);
-      continue;
-    }
-    kept.push(file.text);
-    usedBytes += bytes;
+  for (const file of [...files].sort((left, right) => left.bytes - right.bytes)) {
+    if (usedBytes + file.bytes > maxBytes) break;
+    kept.add(file);
+    usedBytes += file.bytes;
   }
-  return { diff: kept.join(''), omittedFiles };
+  return {
+    diff: files
+      .filter((file) => kept.has(file))
+      .map((file) => file.text)
+      .join(''),
+    omittedFiles: files.filter((file) => !kept.has(file)).map((file) => file.path),
+  };
 };
 
 const rightLinesOfBlock = (block) => {
