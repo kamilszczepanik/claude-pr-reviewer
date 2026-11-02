@@ -3,10 +3,12 @@ import { describe, it } from 'node:test';
 
 import { reviewOutcome } from '../scripts/lib/agent-outcome.mjs';
 
+const REPO_SECRET = 'tajny-klucz-repo-123';
+
 describe('reviewOutcome', () => {
   const outcomeOf = (input) => {
     try {
-      return { returned: reviewOutcome(input) };
+      return { returned: reviewOutcome({ ...input, secrets: [REPO_SECRET] }) };
     } catch ({ message, skipReason, failsCheck, skipDetail }) {
       return { thrown: { message, skipReason, failsCheck, skipDetail } };
     }
@@ -51,13 +53,29 @@ describe('reviewOutcome', () => {
     {
       label: 'an execution error',
       input: {
-        result: { subtype: 'error_during_execution', is_error: true, errors: ['boom'] },
+        result: { subtype: 'error_during_execution', is_error: true, errors: [`boom ${REPO_SECRET}`, 'again'] },
         maxBudgetUsd: 2,
         guardDenials: 0,
       },
       outcome: {
         thrown: {
-          message: 'Przegląd przerwany: error_during_execution',
+          message: 'Przegląd przerwany: error_during_execution; odpowiedź API: boom [ukryte] again',
+          skipReason: undefined,
+          failsCheck: undefined,
+          skipDetail: undefined,
+        },
+      },
+    },
+    {
+      label: 'an API error the classifier does not know',
+      input: {
+        result: { subtype: 'success', is_error: true, api_error_status: null, result: 'Invalid API key\n  · Fix it' },
+        maxBudgetUsd: 2,
+        guardDenials: 0,
+      },
+      outcome: {
+        thrown: {
+          message: 'Przegląd przerwany: success; odpowiedź API: Invalid API key · Fix it',
           skipReason: undefined,
           failsCheck: undefined,
           skipDetail: undefined,

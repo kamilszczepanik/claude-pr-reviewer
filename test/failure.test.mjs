@@ -3,6 +3,8 @@ import { describe, it } from 'node:test';
 
 import { apiSkipError } from '../scripts/lib/failure.mjs';
 
+const REPO_SECRET = 'tajny-klucz-repo-123';
+
 describe('apiSkipError', () => {
   const rejected = (status) => `API Anthropic odrzuciło żądanie (${status})`;
   const longMessage = 'bad\nrequest sk-ant-api03-abcdefghijkl ' + 'x'.repeat(400);
@@ -43,6 +45,10 @@ describe('apiSkipError', () => {
       failure: { message: 'API Error: Connection error.' },
       skip: { skipReason: 'błąd sieci', failsCheck: false, skipDetail: 'API Error: Connection error.' },
     },
+    {
+      failure: { status: 400, message: `bad key ${REPO_SECRET} here` },
+      skip: { skipReason: rejected(400), failsCheck: true, skipDetail: 'bad key [ukryte] here' },
+    },
     { failure: { message: 'Unexpected token in JSON' }, skip: null },
     { failure: { status: null, message: '' }, skip: null },
     {
@@ -56,7 +62,7 @@ describe('apiSkipError', () => {
   ];
   for (const { failure, skip } of cases) {
     it(`keeps the API text and turns only an unexplained rejection red: ${JSON.stringify(failure).slice(0, 80)}`, () => {
-      const error = apiSkipError(failure);
+      const error = apiSkipError({ ...failure, secrets: [REPO_SECRET] });
       if (skip === null) {
         assert.equal(error, null);
         return;
@@ -64,7 +70,12 @@ describe('apiSkipError', () => {
       const { skipReason, failsCheck, skipDetail } = error;
       assert.deepEqual({ skipReason, failsCheck, skipDetail }, skip);
       assert.equal(error.message, skip.skipReason);
-      assert.ok(!/\s{2}|\n/.test(skipDetail) && !skipDetail.includes('sk-ant-') && skipDetail.length <= 300);
+      assert.ok(
+        !/\s{2}|\n/.test(skipDetail) &&
+          !skipDetail.includes('sk-ant-') &&
+          !skipDetail.includes(REPO_SECRET) &&
+          skipDetail.length <= 300,
+      );
     });
   }
 });

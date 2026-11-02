@@ -23,11 +23,14 @@ const classifyApiFailure = ({ status = null, message = '' }) => {
 
 export const skipError = (reason) => Object.assign(new Error(reason), { skipReason: reason });
 
-const detailOf = (message) =>
-  redactSecrets({ text: message, secrets: [] }).replace(/\s+/g, ' ').trim().slice(0, MAX_LOG_CHARS);
+export const apiErrorDetail = ({ text, secrets }) =>
+  redactSecrets({ text, secrets }).replace(/\s+/g, ' ').trim().slice(0, MAX_LOG_CHARS);
 
-export const apiSkipError = ({ status = null, message = '' }) => {
+export const apiSkipError = ({ status = null, message = '', secrets }) => {
   const failure = classifyApiFailure({ status, message });
   if (!failure) return null;
-  return Object.assign(skipError(failure.reason), { skipDetail: detailOf(message), failsCheck: failure.failsCheck });
+  return Object.assign(skipError(failure.reason), {
+    skipDetail: apiErrorDetail({ text: message, secrets }),
+    failsCheck: failure.failsCheck,
+  });
 };

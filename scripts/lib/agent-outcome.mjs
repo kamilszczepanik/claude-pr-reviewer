@@ -1,5 +1,5 @@
 import { MAX_TURNS } from './config.mjs';
-import { apiSkipError, skipError } from './failure.mjs';
+import { apiErrorDetail, apiSkipError, skipError } from './failure.mjs';
 import { parseReview } from './review-result.mjs';
 
 const sumTokens = (modelUsage = {}) =>
@@ -11,16 +11,25 @@ const sumTokens = (modelUsage = {}) =>
     { input: 0, output: 0 },
   );
 
-const failureText = (result) => (result.subtype === 'success' ? result.result : (result.errors ?? []).join(' '));
+const sdkErrorText = (result) => {
+  if (result.subtype !== 'success') return (result.errors ?? []).join(' ');
+  return result.is_error === true ? (result.result ?? '') : '';
+};
 
-export const reviewOutcome = ({ result, maxBudgetUsd, guardDenials }) => {
+const interrupted = ({ subtype, detail }) =>
+  new Error(`Przegląd przerwany: ${subtype}${detail ? `; odpowiedź API: ${detail}` : ''}`);
+
+export const reviewOutcome = ({ result, maxBudgetUsd, guardDenials, secrets }) => {
   if (result.subtype === 'error_max_turns') throw skipError(`wyczerpany limit ${MAX_TURNS} tur`);
   if (result.subtype === 'error_max_budget_usd') throw skipError(`przekroczony budżet ${maxBudgetUsd} USD`);
+  const errorText = sdkErrorText(result);
   if (result.is_error) {
-    const skip = apiSkipError({ status: result.api_error_status ?? null, message: failureText(result) });
+    const skip = apiSkipError({ status: result.api_error_status ?? null, message: errorText, secrets });
     if (skip) throw skip;
   }
-  if (result.subtype !== 'success' || result.is_error) throw new Error(`Przegląd przerwany: ${result.subtype}`);
+  if (result.subtype !== 'success' || result.is_error) {
+    throw interrupted({ subtype: result.subtype, detail: apiErrorDetail({ text: errorText, secrets }) });
+  }
   return {
     review: parseReview(result.structured_output ?? result.result),
     turns: result.num_turns,

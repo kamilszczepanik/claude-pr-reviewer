@@ -102,7 +102,7 @@ describe('settleReview', () => {
   it('exits 1 after an unexplained API rejection and keeps the API text out of the PR', async () => {
     const github = fakeGithub();
     const lines = [];
-    const run = async () => Promise.reject(apiSkipError({ status: 400, message: 'prompt is too long' }));
+    const run = async () => Promise.reject(apiSkipError({ status: 400, message: 'prompt is too long', secrets: [] }));
     assert.equal(await settleReview({ run, github, log: (line) => lines.push(line) }), 1);
     assert.equal(github.calls.posted.length, 1);
     const [comment] = github.calls.posted;

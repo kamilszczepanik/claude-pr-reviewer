@@ -35,7 +35,7 @@ const agentEnv = () =>
 
 const timeoutError = () => skipError(`przekroczony czas ${TIMEOUT_MINUTES} min`);
 
-const collectResult = async ({ model, cwd, systemPrompt, prompt, maxBudgetUsd, onDeny }) => {
+const collectResult = async ({ model, cwd, systemPrompt, prompt, maxBudgetUsd, secrets, onDeny }) => {
   const abortController = new AbortController();
   const timer = setTimeout(() => abortController.abort(), TIMEOUT_MINUTES * 60_000);
   let result = null;
@@ -64,7 +64,7 @@ const collectResult = async ({ model, cwd, systemPrompt, prompt, maxBudgetUsd, o
   } catch (error) {
     if (abortController.signal.aborted) throw timeoutError();
     if (result) return result;
-    throw apiSkipError({ status: error.status ?? null, message: String(error.message ?? '') }) ?? error;
+    throw apiSkipError({ status: error.status ?? null, message: String(error.message ?? ''), secrets }) ?? error;
   } finally {
     clearTimeout(timer);
   }
@@ -76,5 +76,5 @@ const collectResult = async ({ model, cwd, systemPrompt, prompt, maxBudgetUsd, o
 export const runAgentReview = async (request) => {
   let guardDenials = 0;
   const result = await collectResult({ ...request, onDeny: () => (guardDenials += 1) });
-  return reviewOutcome({ result, maxBudgetUsd: request.maxBudgetUsd, guardDenials });
+  return reviewOutcome({ result, maxBudgetUsd: request.maxBudgetUsd, guardDenials, secrets: request.secrets });
 };

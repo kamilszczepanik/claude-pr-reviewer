@@ -44,6 +44,7 @@ const reviewPullRequest = async ({ config, github }) => {
   const headSha = config.headSha ?? pullRequest.head.sha;
   const fullDiff = await fetchDiff({ github, baseSha: pullRequest.base.sha, headSha });
   const { diff, omittedFiles } = truncateDiff({ diff: fullDiff, maxBytes: config.maxDiffBytes });
+  const secrets = [config.apiKey, config.githubToken];
   const rubric = await readRubric({ repoDir: config.repoDir, baseSha: pullRequest.base.sha });
   log(
     `Przegląd PR #${config.prNumber}: diff ${Buffer.byteLength(diff)} B, pominięte pliki ${omittedFiles.length}, rubryka z ${rubric.source}`,
@@ -51,6 +52,7 @@ const reviewPullRequest = async ({ config, github }) => {
   const { review, turns, tokens, costUsd, denials } = await runAgentReview({
     model: config.model,
     maxBudgetUsd: config.maxBudgetUsd,
+    secrets,
     cwd: config.repoDir,
     systemPrompt: SYSTEM_PROMPT,
     prompt: buildPrompt({
@@ -69,7 +71,7 @@ const reviewPullRequest = async ({ config, github }) => {
   });
   const clean = cleanReview({
     review: { summary: review.summary, comments },
-    secrets: [config.apiKey, config.githubToken],
+    secrets,
   });
   const bodyInput = { summary: clean.summary, model: config.model, turns, tokens, omittedFiles, droppedOverCap };
   const used = await publishReview({ github, attempts: reviewAttempts({ headSha, review: clean, bodyInput }) });
