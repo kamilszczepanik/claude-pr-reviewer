@@ -23,6 +23,8 @@ const attemptOn = async ({ route, config, attempt }) => {
   return { ...(await attempt({ route, model })), route, model };
 };
 
+const gatewayJoinReason = (reason) => `${ROUTE_LABELS.gateway}: ${reason.replace(`${ROUTE_LABELS.gateway} `, '')}`;
+
 const joinedSkip = ({ reason, cause }) =>
   Object.assign(skipError(reason), { failsCheck: cause.failsCheck, skipDetail: cause.skipDetail });
 
@@ -42,7 +44,7 @@ export const runRoutedReview = async ({ route, config, attempt, log }) => {
       return await attemptOn({ route: 'gateway', config, attempt });
     } catch (gatewayError) {
       if (!gatewayError.skipReason) throw gatewayError;
-      throw joinedSkip({ reason: `${error.skipReason}; bramka AI: ${gatewayError.skipReason}`, cause: gatewayError });
+      throw joinedSkip({ reason: `${error.skipReason}; ${gatewayJoinReason(gatewayError.skipReason)}`, cause: gatewayError });
     }
   }
 };

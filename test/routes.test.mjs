@@ -54,6 +54,7 @@ describe('runRoutedReview', () => {
   const credit = apiSkipError({ status: 400, message: 'Your credit balance is too low', secrets: [] });
   const apiRejected = apiSkipError({ status: 401, secrets: [] });
   const budget = apiSkipError({ route: 'gateway', status: 402, message: 'quota_for_entity_exceeded', secrets: [] });
+  const gatewayRejected = apiSkipError({ route: 'gateway', status: 400, message: 'bad request', secrets: [] });
   const crash = new Error('boom');
   const done = { review: { summary: 'ok', comments: [] }, turns: 2, tokens: { input: 1, output: 1 }, costUsd: 0, denials: 0 };
   const cases = [
@@ -109,6 +110,21 @@ describe('runRoutedReview', () => {
         skipReason: 'wyczerpany kredyt API Anthropic; bramka AI: wyczerpany budżet klucza bramki AI',
         failsCheck: false,
         skipDetail: 'quota_for_entity_exceeded',
+      },
+      logs: [SWITCH_LOG],
+    },
+    {
+      label: 'API credit, gateway rejects',
+      route: 'api',
+      outcomes: { api: credit, gateway: gatewayRejected },
+      calls: [
+        { route: 'api', model: API_MODEL },
+        { route: 'gateway', model: GATEWAY_MODEL },
+      ],
+      thrown: {
+        skipReason: 'wyczerpany kredyt API Anthropic; bramka AI: odrzuciła żądanie (400)',
+        failsCheck: true,
+        skipDetail: 'bad request',
       },
       logs: [SWITCH_LOG],
     },
