@@ -1,11 +1,11 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 
+import { MAX_TURNS } from './config.mjs';
 import { skipError, skipReasonFor } from './failure.mjs';
 import { parseReview, REVIEW_JSON_SCHEMA } from './review-result.mjs';
 import { createRepoGuard, GUARDED_TOOLS } from './tool-guard.mjs';
 
 const READ_ONLY_TOOLS = ['Read', 'Grep', 'Glob'];
-const MAX_TURNS = 40;
 const TIMEOUT_MINUTES = 15;
 const PASSED_ENV = [
   'ANTHROPIC_API_KEY',
@@ -54,7 +54,7 @@ const collectResult = async ({ model, cwd, systemPrompt, prompt, maxBudgetUsd, o
       prompt,
       options: {
         model,
-        effort: 'high',
+        effort: 'medium',
         cwd,
         tools: READ_ONLY_TOOLS,
         allowedTools: READ_ONLY_TOOLS,

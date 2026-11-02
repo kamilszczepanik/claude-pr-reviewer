@@ -13,7 +13,7 @@ inputs:
   max-budget-usd:
     description: Hard cost cap of one review in USD
     required: false
-    default: '5'
+    default: '2'
   pr-number:
     description: Pull request number
     required: true

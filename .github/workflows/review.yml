@@ -11,11 +11,11 @@ on:
         default: 15
       max-diff-bytes:
         type: number
-        default: 400000
+        default: 150000
       max-budget-usd:
         description: Hard cost cap of one review in USD; the run is skipped, not failed, when it is reached
         type: number
-        default: 5
+        default: 2
       pr-number:
         description: Pull request number for a manual rerun from workflow_dispatch
         type: string
@@ -81,7 +81,7 @@ jobs:
 
       - name: Review with Claude
         if: steps.pr.outputs.fork == 'false'
-        uses: kamilszczepanik/claude-pr-reviewer@v1.2.0
+        uses: kamilszczepanik/claude-pr-reviewer@v1.3.0
         with:
           model: ${{ inputs.model }}
           max-comments: ${{ inputs.max-comments }}

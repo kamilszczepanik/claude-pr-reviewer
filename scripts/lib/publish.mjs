@@ -20,7 +20,7 @@ const isOwnSkipComment = (comment) => comment.user?.type === 'Bot' && comment.bo
 
 const reportSkip = async ({ github, reason, log }) => {
   log(`Przegląd Claude pominięty: ${reason}`);
-  const body = `${SKIP_MARKER}\nPrzegląd Claude pominięty: ${reason}`;
+  const body = `${SKIP_MARKER}\nPrzegląd Claude pominięty: ${reason}.\n\nTen przebieg nie sprawdził PR-a i nie zostawił żadnych uwag, więc nie traktuj go jako przeglądu bez uwag. Uruchom przegląd ponownie albo sprawdź zmiany ręcznie.`;
   try {
     const existing = (await github.listComments()).find(isOwnSkipComment);
     if (existing) await github.updateComment({ id: existing.id, body });

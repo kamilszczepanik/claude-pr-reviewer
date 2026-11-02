@@ -45,7 +45,7 @@ Uprawnienie `pull-requests: write` dostaje tylko ta jedna praca; poziom workflow
 dopisana później praca go nie odziedziczyła. Warunek `if` pomija szkice (przegląd przychodzi przy „Ready for review”)
 i PR-y z forków, które nie dostają sekretów; `concurrency` szereguje przebiegi jednego PR-a.
 
-Model: domyślnie `claude-sonnet-5-5` (przegląd typowego PR-a około 0,15 USD). Głębszy przegląd: `model: claude-opus-5-5`
+Model: domyślnie `claude-sonnet-5-5` (przegląd typowego PR-a około 0,15–0,20 USD). Głębszy przegląd: `model: claude-opus-5-5`
 w `with:`.
 
 ## Przypięcie
@@ -66,13 +66,13 @@ Wołający: `asystent`, `platero-ai`, `dg-cars`.
 
 Wejścia (`workflow_call`), wszystkie opcjonalne:
 
-| Wejście          | Typ    | Domyślnie         | Znaczenie                                                                       |
-| ---------------- | ------ | ----------------- | ------------------------------------------------------------------------------- |
+| Wejście          | Typ    | Domyślnie           | Znaczenie                                                                       |
+| ---------------- | ------ | ------------------- | ------------------------------------------------------------------------------- |
 | `model`          | string | `claude-sonnet-5-5` | identyfikator modelu                                                            |
-| `max-comments`   | number | 15                | najwięcej uwag w linii; reszta jest liczona w podsumowaniu                      |
-| `max-diff-bytes` | number | 400000            | rozmiar diffu dla modelu, cięty na granicy pliku                                |
-| `max-budget-usd` | number | 5                 | twardy sufit kosztu jednego przeglądu; po przekroczeniu przegląd jest pominięty |
-| `pr-number`      | string | puste             | numer PR przy ręcznym ponowieniu; tylko cyfry, inaczej praca kończy się błędem  |
+| `max-comments`   | number | 15                  | najwięcej uwag w linii; reszta jest liczona w podsumowaniu                      |
+| `max-diff-bytes` | number | 150000              | rozmiar diffu dla modelu, cięty na granicy pliku, najmniejsze pliki pierwsze    |
+| `max-budget-usd` | number | 2                   | twardy sufit kosztu jednego przeglądu; po przekroczeniu przegląd jest pominięty |
+| `pr-number`      | string | puste               | numer PR przy ręcznym ponowieniu; tylko cyfry, inaczej praca kończy się błędem  |
 
 Sekret: `ANTHROPIC_API_KEY`, opcjonalny. Wołający przekazuje go jawnie (nie `secrets: inherit`). Bez niego przegląd
 jest pominięty z komentarzem, bez czerwonego checka. Klucz trafia wyłącznie do procesu Agent SDK (biała lista
@@ -97,12 +97,16 @@ pominięciu. Nie wypycha commitów, nie zmienia etykiet, nie zamyka wątków.
   przypięta do tagu własnej wersji (`package.json`), więc workflow przypięty do `v1.x.y` uruchamia skrypty z tego
   samego wydania; pilnuje tego `test/release.test.mjs`.
 - `scripts/review.mjs` pobiera diff `compare/<base>...<head>` dla tego samego `head.sha`, który sprawdził checkout,
-  więc numery linii zgadzają się z plikami czytanymi przez model. Diff tnie do `max-diff-bytes` na granicy pliku.
+  więc numery linii zgadzają się z plikami czytanymi przez model. Diff tnie do `max-diff-bytes` na granicy pliku,
+  wypełniając limit od najmniejszych plików, żeby jeden duży plik (lockfile, fixture) nie wypchnął zmian w kodzie.
+  Pominięte pliki trafiają do modelu w osobnym bloku danych, a treść recenzji zaczyna się od informacji, których
+  plików przegląd nie objął. Prompt podaje modelowi limit tur, żeby przy jego końcu oddał przegląd tego, co
+  przeczytał, zamiast przekroczyć limit i dać pominięcie.
 - Rubryka to `CLAUDE.md` i `AGENTS.md` z commita bazowego PR-a (`git show <base>:CLAUDE.md`), więc PR nie osłabia
   reguł, które go oceniają. Gdy commita bazowego nie ma w checkoucie, rubryka pochodzi z heada, a log mówi
   „rubryka z head”.
-- Agent SDK: wysoki wysiłek, narzędzia `Read`, `Grep`, `Glob`, tryb `dontAsk`, bez ustawień z dysku
-  (`settingSources: []`, więc hooki z PR-a się nie uruchamiają), limit 40 tur, `max-budget-usd`, limit czasu
+- Agent SDK: średni wysiłek, narzędzia `Read`, `Grep`, `Glob`, tryb `dontAsk`, bez ustawień z dysku
+  (`settingSources: []`, więc hooki z PR-a się nie uruchamiają), limit 20 tur, `max-budget-usd`, limit czasu
   15 minut, wynik jako JSON ze schematu. Tytuł, opis, rubryka i diff mają limity długości, a znaczniki danych w ich
   treści są neutralizowane.
 - Wynik przechodzi walidację, uwagi spoza linii diffu odpadają, reszta jest cięta do `max-comments` według powagi.
