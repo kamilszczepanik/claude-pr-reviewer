@@ -6,6 +6,7 @@ const DEFAULT_MAX_DIFF_BYTES = 150_000;
 const DEFAULT_MAX_BUDGET_USD = 2;
 
 export const MAX_TURNS = 20;
+export const MAX_LOG_CHARS = 300;
 
 const positiveInt = (value, fallback) => {
   const parsed = Number(value);

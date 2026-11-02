@@ -1,9 +1,9 @@
+import { MAX_LOG_CHARS } from './config.mjs';
 import { redactSecrets } from './sanitize.mjs';
 
 const CREDIT_EXHAUSTED = /credit balance|insufficient.?credit|billing/i;
 const NETWORK_FAILURE =
   /connection error|fetch failed|network|socket hang up|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN/i;
-const MAX_DETAIL_CHARS = 300;
 
 const expected = (reason) => ({ reason, failsCheck: false });
 
@@ -21,12 +21,10 @@ const classifyApiFailure = ({ status = null, message = '' }) => {
   return null;
 };
 
-export const skipReasonFor = (failure) => classifyApiFailure(failure)?.reason ?? null;
-
 export const skipError = (reason) => Object.assign(new Error(reason), { skipReason: reason });
 
 const detailOf = (message) =>
-  redactSecrets({ text: message, secrets: [] }).replace(/\s+/g, ' ').trim().slice(0, MAX_DETAIL_CHARS);
+  redactSecrets({ text: message, secrets: [] }).replace(/\s+/g, ' ').trim().slice(0, MAX_LOG_CHARS);
 
 export const apiSkipError = ({ status = null, message = '' }) => {
   const failure = classifyApiFailure({ status, message });

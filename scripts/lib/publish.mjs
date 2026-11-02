@@ -1,5 +1,6 @@
+import { MAX_LOG_CHARS } from './config.mjs';
+
 const UNPROCESSABLE = 422;
-const MAX_LOG_CHARS = 300;
 const HIDDEN_MESSAGE_ERRORS = new Set(['SyntaxError', 'ZodError']);
 
 export const SKIP_MARKER = '<!-- claude-pr-reviewer:skipped -->';
