@@ -13,8 +13,7 @@ export const routeEnv = ({ route, baseEnv, gatewayKey }) => {
   if (route === 'gateway') {
     return { ...baseEnv, ANTHROPIC_API_KEY: '', ANTHROPIC_BASE_URL: GATEWAY_BASE_URL, ANTHROPIC_AUTH_TOKEN: gatewayKey };
   }
-  const { ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN, ...apiEnv } = baseEnv;
-  return apiEnv;
+  return baseEnv;
 };
 
 const modelFor = ({ route, config }) => (route === 'gateway' ? config.gatewayModel : config.model);

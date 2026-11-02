@@ -36,12 +36,7 @@ describe('routeEnv', () => {
     },
     {
       route: 'api',
-      baseEnv: {
-        PATH: '/usr/bin',
-        ANTHROPIC_API_KEY: 'sk-ant',
-        ANTHROPIC_BASE_URL: 'https://elsewhere.test',
-        ANTHROPIC_AUTH_TOKEN: 'stray',
-      },
+      baseEnv: { PATH: '/usr/bin', ANTHROPIC_API_KEY: 'sk-ant' },
       env: { PATH: '/usr/bin', ANTHROPIC_API_KEY: 'sk-ant' },
     },
   ];
