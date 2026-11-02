@@ -104,7 +104,7 @@ const reviewPullRequest = async ({ config, github }) => {
 
 const main = async () => {
   const config = await readConfig(process.env);
-  const github = createGithub({ token: config.githubToken, repo: config.repo, prNumber: config.prNumber });
+  const github = createGithub({ token: config.githubToken, repo: config.repo, prNumber: config.prNumber, log });
   return settleReview({ run: () => reviewPullRequest({ config, github }), github, log });
 };
 

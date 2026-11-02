@@ -44,26 +44,30 @@ const githubRequest = async ({ token, path, method, body, accept = JSON_ACCEPT }
   return accept.endsWith('diff') ? response.text() : response.json();
 };
 
-const nextPageUrl = (linkHeader) => {
+const nextPageUrl = ({ linkHeader, log }) => {
   const next = (linkHeader ?? '')
     .split(',')
     .map((part) => part.match(/<([^>]+)>\s*;\s*rel="next"/))
     .find(Boolean);
-  return next && next[1].startsWith(`${API_URL}/`) ? next[1] : null;
+  if (!next) return null;
+  if (next[1].startsWith(`${API_URL}/`)) return next[1];
+  log(`Komentarze PR: pomijam następną stronę spoza ${API_URL}`);
+  return null;
 };
 
-const listAllPages = async ({ token, path }) => {
+const listAllPages = async ({ token, path, log }) => {
   const comments = [];
   let url = `${API_URL}/${path}`;
   for (let pageCount = 0; url && pageCount < MAX_COMMENT_PAGES; pageCount += 1) {
     const response = await githubResponse({ token, url });
     comments.push(...(await response.json()));
-    url = nextPageUrl(response.headers.get('link'));
+    url = nextPageUrl({ linkHeader: response.headers.get('link'), log });
   }
+  if (url) log(`Komentarze PR: przeczytane tylko pierwsze ${MAX_COMMENT_PAGES} stron, dalszych nie czytam`);
   return comments;
 };
 
-export const createGithub = ({ token, repo, prNumber }) => {
+export const createGithub = ({ token, repo, prNumber, log }) => {
   const pullPath = `repos/${repo}/pulls/${prNumber}`;
   const commentsPath = `repos/${repo}/issues/${prNumber}/comments`;
   return {
@@ -81,7 +85,7 @@ export const createGithub = ({ token, repo, prNumber }) => {
         path: `${pullPath}/reviews`,
         body: { commit_id: commitId, event: 'COMMENT', body, comments },
       }),
-    listComments: () => listAllPages({ token, path: `${commentsPath}?per_page=100` }),
+    listComments: () => listAllPages({ token, path: `${commentsPath}?per_page=100`, log }),
     postComment: (body) => githubRequest({ token, method: 'POST', path: commentsPath, body: { body } }),
     updateComment: ({ id, body }) =>
       githubRequest({ token, method: 'PATCH', path: `repos/${repo}/issues/comments/${id}`, body: { body } }),

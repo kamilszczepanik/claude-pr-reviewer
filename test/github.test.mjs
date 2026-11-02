@@ -27,24 +27,28 @@ describe('listComments', () => {
       ],
       requests: 3,
       result: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }],
+      logs: [],
     },
     {
       label: 'stops after one page without a Link header',
       pages: [page({ comments: [{ id: 1 }, { id: 2 }] })],
       requests: 1,
       result: [{ id: 1 }, { id: 2 }],
+      logs: [],
     },
     {
       label: 'never follows a next page on another host',
       pages: [page({ comments: [{ id: 1 }], next: 'https://evil.example/repos/o/r/issues/7/comments?page=2' })],
       requests: 1,
       result: [{ id: 1 }],
+      logs: ['Komentarze PR: pomijam następną stronę spoza https://api.github.com'],
     },
     {
       label: 'reads at most ten pages',
       pages: endless,
       requests: 10,
       result: endless.slice(0, 10).flatMap(({ comments }) => comments),
+      logs: ['Komentarze PR: przeczytane tylko pierwsze 10 stron, dalszych nie czytam'],
     },
     {
       label: 'skips when a later page answers 502',
@@ -54,21 +58,25 @@ describe('listComments', () => {
       ],
       requests: 2,
       error: { skipReason: 'API GitHuba niedostępne (502)' },
+      logs: [],
     },
   ];
-  for (const { label, pages, requests, result, error } of cases) {
+  for (const { label, pages, requests, result, error, logs } of cases) {
     it(label, async () => {
       const calls = [];
+      const lines = [];
       globalThis.fetch = async (url, init) => {
         calls.push({ url, init });
         assert.ok(calls.length <= pages.length, `unexpected request ${calls.length} to ${url}`);
         const { comments, status, link } = pages[calls.length - 1];
         return new Response(JSON.stringify(comments), { status, headers: link ? { link } : {} });
       };
-      const listing = createGithub({ token: 't', repo: 'o/r', prNumber: 7 }).listComments();
+      const github = createGithub({ token: 't', repo: 'o/r', prNumber: 7, log: (line) => lines.push(line) });
+      const listing = github.listComments();
       if (error) await assert.rejects(listing, error);
       else assert.deepEqual(await listing, result);
       assert.equal(calls.length, requests);
+      assert.deepEqual(lines, logs);
       assert.equal(calls[0].url, `${COMMENTS}?per_page=100`);
       for (const { init } of calls) assert.equal(init.headers.authorization, 'Bearer t');
     });
