@@ -154,4 +154,21 @@ describe('review body', () => {
     assert.ok(body.length <= GITHUB_BODY_LIMIT);
     assert.match(body, /<sub>Przegląd Claude · model claude-opus-5-5/);
   });
+
+  it('escapes model paths in the fallback list like omitted files', () => {
+    const body = buildReviewBody({
+      summary: 'Podsumowanie.',
+      model: 'claude-opus-5-5',
+      turns: 1,
+      tokens: { input: 1, output: 1 },
+      omittedFiles: [],
+      droppedOverCap: 0,
+      fallbackComments: [{ path: 'src/`a`<img src=x>@kamil.ts', line: 3, severity: 'high', body: 'b' }],
+    });
+    assert.ok(body.includes('"src/'));
+    assert.ok(body.includes(':3 (wysoka): b'));
+    assert.ok(!body.includes('<img'));
+    assert.ok(body.includes('@\u200Bkamil'));
+    assert.ok(!body.includes('`src/'));
+  });
 });

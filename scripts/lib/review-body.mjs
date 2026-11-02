@@ -49,7 +49,8 @@ export const buildReviewBody = ({
   const truncation = omittedFiles.length > 0 ? omittedFilesNote(omittedFiles) : '';
   const dropped = droppedOverCap > 0 ? `Pominięte uwagi ponad limit: ${droppedOverCap}.` : '';
   const fallback = fallbackComments.map(
-    ({ path, line, severity, body }) => `- \`${path}:${line}\` (${SEVERITY_LABELS[severity]}): ${body}`,
+    ({ path, line, severity, body }) =>
+      `- ${sanitizeMarkdown(JSON.stringify(path))}:${line} (${SEVERITY_LABELS[severity]}): ${body}`,
   );
   const content = [truncation, summary, dropped, fallback.join('\n')].filter(Boolean).join('\n\n');
   return `${capLength({ text: content, maxChars: MAX_BODY_CHARS })}\n\n${statusLine({ model, turns, tokens })}`;
