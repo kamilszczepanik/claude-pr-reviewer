@@ -1,3 +1,4 @@
+import { ROUTE_LABELS } from './routes.mjs';
 import { capLength, cleanModelText, sanitizeMarkdown } from './sanitize.mjs';
 
 export const GITHUB_BODY_LIMIT = 65_536;
@@ -23,8 +24,8 @@ export const toInlineComment = ({ path, line, severity, body }) => ({
   body: `**Powaga: ${SEVERITY_LABELS[severity]}**\n\n${body}`,
 });
 
-const statusLine = ({ model, turns, tokens }) =>
-  `<sub>Przegląd Claude · model ${model} · tury ${turns} · tokeny wejścia ${tokens.input}, wyjścia ${tokens.output}</sub>`;
+const statusLine = ({ route, model, turns, tokens }) =>
+  `<sub>Przegląd Claude · trasa: ${ROUTE_LABELS[route]} · model ${model} · tury ${turns} · tokeny wejścia ${tokens.input}, wyjścia ${tokens.output}</sub>`;
 
 const truncationNote = (omittedFiles) =>
   `**Diff obcięty:** Claude nie widział zmian w ${omittedFiles.length} plikach i ten przegląd ich nie obejmuje`;
@@ -39,6 +40,7 @@ const omittedFilesNote = (omittedFiles) =>
 
 export const buildReviewBody = ({
   summary,
+  route,
   model,
   turns,
   tokens,
@@ -52,10 +54,10 @@ export const buildReviewBody = ({
     sanitizeMarkdown(`- ${JSON.stringify(path)}:${line} (${SEVERITY_LABELS[severity]}): ${body}`),
   );
   const content = [truncation, summary, dropped, fallback.join('\n')].filter(Boolean).join('\n\n');
-  return `${capLength({ text: content, maxChars: MAX_BODY_CHARS })}\n\n${statusLine({ model, turns, tokens })}`;
+  return `${capLength({ text: content, maxChars: MAX_BODY_CHARS })}\n\n${statusLine({ route, model, turns, tokens })}`;
 };
 
-export const buildShortBody = ({ summary, model, turns, tokens, omittedFiles }) => {
+export const buildShortBody = ({ summary, route, model, turns, tokens, omittedFiles }) => {
   const truncation = omittedFiles.length > 0 ? `${truncationNote(omittedFiles)}.\n\n` : '';
-  return `${truncation}${capLength({ text: summary, maxChars: MAX_SHORT_SUMMARY_CHARS })}\n\n${statusLine({ model, turns, tokens })}`;
+  return `${truncation}${capLength({ text: summary, maxChars: MAX_SHORT_SUMMARY_CHARS })}\n\n${statusLine({ route, model, turns, tokens })}`;
 };

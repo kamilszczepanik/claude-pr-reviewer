@@ -19,12 +19,12 @@ const sdkErrorText = (result) => {
 const interrupted = ({ subtype, detail }) =>
   new Error(`Przegląd przerwany: ${subtype}${detail ? `; odpowiedź API: ${detail}` : ''}`);
 
-export const reviewOutcome = ({ result, maxBudgetUsd, guardDenials, secrets }) => {
+export const reviewOutcome = ({ result, maxBudgetUsd, guardDenials, secrets, route = 'api' }) => {
   if (result.subtype === 'error_max_turns') throw skipError(`wyczerpany limit ${MAX_TURNS} tur`);
   if (result.subtype === 'error_max_budget_usd') throw skipError(`przekroczony budżet ${maxBudgetUsd} USD`);
   const errorText = sdkErrorText(result);
   if (result.is_error) {
-    const skip = apiSkipError({ status: result.api_error_status ?? null, message: errorText, secrets });
+    const skip = apiSkipError({ status: result.api_error_status ?? null, message: errorText, secrets, route });
     if (skip) throw skip;
   }
   if (result.subtype !== 'success' || result.is_error) {

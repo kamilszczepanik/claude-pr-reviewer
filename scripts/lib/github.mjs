@@ -12,9 +12,12 @@ const send = async ({ url, init }) => {
   }
 };
 
-const githubRequest = async ({ token, path, method = 'GET', body, accept = 'application/vnd.github+json' }) => {
+const MAX_COMMENT_PAGES = 10;
+const JSON_ACCEPT = 'application/vnd.github+json';
+
+const githubResponse = async ({ token, url, method = 'GET', body, accept = JSON_ACCEPT }) => {
   const response = await send({
-    url: `${API_URL}/${path}`,
+    url,
     init: {
       method,
       headers: {
@@ -30,12 +33,41 @@ const githubRequest = async ({ token, path, method = 'GET', body, accept = 'appl
     throw Object.assign(skipError(`${GITHUB_UNAVAILABLE} (${response.status})`), { status: response.status });
   }
   if (!response.ok) {
+    const path = url.slice(API_URL.length + 1);
     throw Object.assign(new Error(`GitHub ${method} ${path}: ${response.status}`), { status: response.status });
   }
+  return response;
+};
+
+const githubRequest = async ({ token, path, method, body, accept = JSON_ACCEPT }) => {
+  const response = await githubResponse({ token, url: `${API_URL}/${path}`, method, body, accept });
   return accept.endsWith('diff') ? response.text() : response.json();
 };
 
-export const createGithub = ({ token, repo, prNumber }) => {
+const nextPageUrl = ({ linkHeader, log }) => {
+  const next = (linkHeader ?? '')
+    .split(',')
+    .map((part) => part.match(/<([^>]+)>\s*;\s*rel="next"/))
+    .find(Boolean);
+  if (!next) return null;
+  if (next[1].startsWith(`${API_URL}/`)) return next[1];
+  log(`Komentarze PR: pomijam następną stronę spoza ${API_URL}`);
+  return null;
+};
+
+const listAllPages = async ({ token, path, log }) => {
+  const comments = [];
+  let url = `${API_URL}/${path}`;
+  for (let pageCount = 0; url && pageCount < MAX_COMMENT_PAGES; pageCount += 1) {
+    const response = await githubResponse({ token, url });
+    comments.push(...(await response.json()));
+    url = nextPageUrl({ linkHeader: response.headers.get('link'), log });
+  }
+  if (url) log(`Komentarze PR: przeczytane tylko pierwsze ${MAX_COMMENT_PAGES} stron, dalszych nie czytam`);
+  return comments;
+};
+
+export const createGithub = ({ token, repo, prNumber, log }) => {
   const pullPath = `repos/${repo}/pulls/${prNumber}`;
   const commentsPath = `repos/${repo}/issues/${prNumber}/comments`;
   return {
@@ -53,7 +85,7 @@ export const createGithub = ({ token, repo, prNumber }) => {
         path: `${pullPath}/reviews`,
         body: { commit_id: commitId, event: 'COMMENT', body, comments },
       }),
-    listComments: () => githubRequest({ token, path: `${commentsPath}?per_page=100` }),
+    listComments: () => listAllPages({ token, path: `${commentsPath}?per_page=100`, log }),
     postComment: (body) => githubRequest({ token, method: 'POST', path: commentsPath, body: { body } }),
     updateComment: ({ id, body }) =>
       githubRequest({ token, method: 'PATCH', path: `repos/${repo}/issues/comments/${id}`, body: { body } }),

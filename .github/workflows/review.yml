@@ -20,8 +20,14 @@ on:
         description: Pull request number for a manual rerun from workflow_dispatch
         type: string
         default: ''
+      gateway-model:
+        description: Model id on the AI Gateway fallback route
+        type: string
+        default: anthropic/claude-sonnet-5.5
     secrets:
       ANTHROPIC_API_KEY:
+        required: false
+      AI_GATEWAY_API_KEY:
         required: false
 
 permissions:
@@ -81,7 +87,7 @@ jobs:
 
       - name: Review with Claude
         if: steps.pr.outputs.fork == 'false'
-        uses: kamilszczepanik/claude-pr-reviewer@v1.3.1
+        uses: kamilszczepanik/claude-pr-reviewer@v1.4.0
         with:
           model: ${{ inputs.model }}
           max-comments: ${{ inputs.max-comments }}
@@ -91,4 +97,6 @@ jobs:
           head-sha: ${{ steps.pr.outputs.head-sha }}
           repo-dir: ${{ github.workspace }}
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          ai-gateway-api-key: ${{ secrets.AI_GATEWAY_API_KEY }}
+          gateway-model: ${{ inputs.gateway-model }}
           github-token: ${{ github.token }}

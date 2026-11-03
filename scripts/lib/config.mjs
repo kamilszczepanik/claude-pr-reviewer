@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 
 const DEFAULT_MODEL = 'claude-sonnet-5-5';
+const DEFAULT_GATEWAY_MODEL = 'anthropic/claude-sonnet-5.5';
 const DEFAULT_MAX_COMMENTS = 15;
 const DEFAULT_MAX_DIFF_BYTES = 150_000;
 const DEFAULT_MAX_BUDGET_USD = 2;
@@ -36,5 +37,7 @@ export const readConfig = async (env) => {
     repoDir: env.REPO_DIR || process.cwd(),
     githubToken: env.GH_TOKEN,
     apiKey: env.ANTHROPIC_API_KEY || null,
+    gatewayKey: env.AI_GATEWAY_API_KEY || null,
+    gatewayModel: env.GATEWAY_MODEL || DEFAULT_GATEWAY_MODEL,
   };
 };

@@ -4,10 +4,10 @@ import { reviewOutcome } from './agent-outcome.mjs';
 import { MAX_TURNS } from './config.mjs';
 import { apiSkipError, skipError } from './failure.mjs';
 import { REVIEW_JSON_SCHEMA } from './review-result.mjs';
+import { routeEnv } from './routes.mjs';
 import { createRepoGuard, GUARDED_TOOLS } from './tool-guard.mjs';
 
 const READ_ONLY_TOOLS = ['Read', 'Grep', 'Glob'];
-const TIMEOUT_MINUTES = 15;
 const PASSED_ENV = [
   'ANTHROPIC_API_KEY',
   'PATH',
@@ -33,11 +33,22 @@ const agentEnv = () =>
     PASSED_ENV.filter((name) => process.env[name] !== undefined).map((name) => [name, process.env[name]]),
   );
 
-const timeoutError = () => skipError(`przekroczony czas ${TIMEOUT_MINUTES} min`);
+const timeoutError = (timeoutMs) => skipError(`przekroczony czas ${Math.ceil(timeoutMs / 60_000)} min`);
 
-const collectResult = async ({ model, cwd, systemPrompt, prompt, maxBudgetUsd, secrets, onDeny }) => {
+const collectResult = async ({
+  model,
+  route,
+  gatewayKey,
+  timeoutMs,
+  cwd,
+  systemPrompt,
+  prompt,
+  maxBudgetUsd,
+  secrets,
+  onDeny,
+}) => {
   const abortController = new AbortController();
-  const timer = setTimeout(() => abortController.abort(), TIMEOUT_MINUTES * 60_000);
+  const timer = setTimeout(() => abortController.abort(), timeoutMs);
   let result = null;
   try {
     for await (const message of query({
@@ -56,19 +67,21 @@ const collectResult = async ({ model, cwd, systemPrompt, prompt, maxBudgetUsd, s
         systemPrompt,
         outputFormat: { type: 'json_schema', schema: REVIEW_JSON_SCHEMA },
         hooks: { PreToolUse: [{ matcher: GUARDED_TOOLS, hooks: [createRepoGuard({ root: cwd, onDeny })] }] },
-        env: agentEnv(),
+        env: routeEnv({ route, baseEnv: agentEnv(), gatewayKey }),
       },
     })) {
       if (message.type === 'result') result = message;
     }
   } catch (error) {
-    if (abortController.signal.aborted) throw timeoutError();
+    if (abortController.signal.aborted) throw timeoutError(timeoutMs);
     if (result) return result;
-    throw apiSkipError({ status: error.status ?? null, message: String(error.message ?? ''), secrets }) ?? error;
+    throw (
+      apiSkipError({ status: error.status ?? null, message: String(error.message ?? ''), secrets, route }) ?? error
+    );
   } finally {
     clearTimeout(timer);
   }
-  if (!result && abortController.signal.aborted) throw timeoutError();
+  if (!result && abortController.signal.aborted) throw timeoutError(timeoutMs);
   if (!result) throw new Error('Agent SDK nie zwrócił wyniku');
   return result;
 };
@@ -76,5 +89,11 @@ const collectResult = async ({ model, cwd, systemPrompt, prompt, maxBudgetUsd, s
 export const runAgentReview = async (request) => {
   let guardDenials = 0;
   const result = await collectResult({ ...request, onDeny: () => (guardDenials += 1) });
-  return reviewOutcome({ result, maxBudgetUsd: request.maxBudgetUsd, guardDenials, secrets: request.secrets });
+  return reviewOutcome({
+    result,
+    maxBudgetUsd: request.maxBudgetUsd,
+    guardDenials,
+    secrets: request.secrets,
+    route: request.route,
+  });
 };

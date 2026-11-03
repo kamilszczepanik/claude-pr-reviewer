@@ -51,6 +51,23 @@ describe('reviewOutcome', () => {
       },
     },
     {
+      label: 'an exhausted gateway key budget',
+      input: {
+        route: 'gateway',
+        result: { subtype: 'success', is_error: true, api_error_status: 402, result: 'quota_for_entity_exceeded' },
+        maxBudgetUsd: 2,
+        guardDenials: 0,
+      },
+      outcome: {
+        thrown: {
+          message: 'wyczerpany budżet klucza bramki AI',
+          skipReason: 'wyczerpany budżet klucza bramki AI',
+          failsCheck: false,
+          skipDetail: 'quota_for_entity_exceeded',
+        },
+      },
+    },
+    {
       label: 'an execution error',
       input: {
         result: { subtype: 'error_during_execution', is_error: true, errors: [`boom ${REPO_SECRET}`, 'again'] },
