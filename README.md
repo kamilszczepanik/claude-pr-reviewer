@@ -48,8 +48,8 @@ Uprawnienie `pull-requests: write` dostaje tylko ta jedna praca; poziom workflow
 dopisana później praca go nie odziedziczyła. Warunek `if` pomija szkice (przegląd przychodzi przy „Ready for review”)
 i PR-y z forków, które nie dostają sekretów; `concurrency` szereguje przebiegi jednego PR-a.
 
-Model: domyślnie `claude-sonnet-5-5` (przegląd typowego PR-a około 0,15–0,20 USD). Głębszy przegląd: `model: claude-opus-5-5`
-w `with:`.
+Model: domyślnie `claude-sonnet-5-5` (przegląd typowego PR-a około 0,10–0,50 USD, zwykle 0,30–0,50; pomiar z 3.11 na
+siedmiu przeglądach). Głębszy przegląd: `model: claude-opus-5-5` w `with:`.
 
 ## Przypięcie
 
@@ -176,8 +176,9 @@ Na trasie bramki proces Agent SDK dostaje `ANTHROPIC_BASE_URL=https://ai-gateway
 Model wybiera wejście `gateway-model`, domyślnie `anthropic/claude-sonnet-5.5`. Linia stanu recenzji mówi wtedy
 „trasa: bramka AI”, a log zapisuje powód przełączenia („Trasa kredyt API: <powód>; ponawiam przez bramkę AI”).
 
-Koszt przeglądu bramką to około 0,05–0,15 USD; `max-budget-usd` i limit tur obowiązują jak na kredycie API. Twardym
-limitem jest budżet klucza bramki (20 USD miesięcznie), a jego wyczerpanie (402) daje pominięcie bez czerwonego
+Koszt przeglądu bramką jest taki sam jak na kredycie API, około 0,10–0,50 USD, zwykle 0,30–0,50, bo obie trasy liczą te
+same tokeny tego samego modelu po cenie katalogowej; `max-budget-usd` i limit tur obowiązują jak na kredycie API.
+Twardym limitem jest budżet klucza bramki (20 USD miesięcznie), a jego wyczerpanie (402) daje pominięcie bez czerwonego
 checka. Obrót klucza: nowy klucz w panelu AI Gateway, podmiana sekretu w każdym repozytorium
 (`gh secret set AI_GATEWAY_API_KEY --repo <owner>/<repo>`), dopiero potem wyłączenie starego.
 
