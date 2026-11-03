@@ -23,8 +23,9 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: kamilszczepanik/claude-pr-reviewer/.github/workflows/review.yml@725b78491692931764120191d62166f253e470a6
+    uses: kamilszczepanik/claude-pr-reviewer/.github/workflows/review.yml@1313a005734da1b79cea63a5001594c74efb94d7
     with:
       pr-number: ${{ inputs.pr-number }}
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
