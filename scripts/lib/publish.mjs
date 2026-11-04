@@ -1,4 +1,5 @@
 import { MAX_LOG_CHARS } from './config.mjs';
+import { apiErrorDetail } from './failure.mjs';
 
 const UNPROCESSABLE = 422;
 const HIDDEN_MESSAGE_ERRORS = new Set(['SyntaxError', 'ZodError']);
@@ -36,21 +37,36 @@ const reportSkip = async ({ github, reason, detail, failsCheck, log }) => {
   }
 };
 
-export const failureLine = (error) => {
-  const detail = HIDDEN_MESSAGE_ERRORS.has(error.name) ? 'treść ukryta' : String(error.message);
+const SECRET_ENV_NAMES = ['ANTHROPIC_API_KEY', 'AI_GATEWAY_API_KEY', 'GH_TOKEN'];
+
+const envSecrets = (env) => SECRET_ENV_NAMES.map((name) => env[name]).filter(Boolean);
+
+export const failureLine = ({ error, secrets }) => {
+  const detail = HIDDEN_MESSAGE_ERRORS.has(error.name)
+    ? 'treść ukryta'
+    : apiErrorDetail({ text: String(error.message), secrets });
   return `Przegląd Claude nie powiódł się: ${error.name}: ${detail}`.slice(0, MAX_LOG_CHARS);
 };
 
-export const settleReview = async ({ run, github, log }) => {
+export const settleReview = async ({ run, github, log, secrets = [] }) => {
   try {
     await run();
     return 0;
   } catch (error) {
     if (!error.skipReason) {
-      log(failureLine(error));
+      log(failureLine({ error, secrets }));
       return 1;
     }
     await reportSkip({ github, reason: error.skipReason, detail: error.skipDetail, failsCheck: error.failsCheck, log });
     return error.failsCheck ? 1 : 0;
+  }
+};
+
+export const runReviewProcess = async ({ main, env, log }) => {
+  try {
+    return await main();
+  } catch (error) {
+    log(failureLine({ error, secrets: envSecrets(env) }));
+    return 1;
   }
 };

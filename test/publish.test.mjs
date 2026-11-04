@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { apiSkipError, skipError } from '../scripts/lib/failure.mjs';
-import { publishReview, settleReview, SKIP_MARKER } from '../scripts/lib/publish.mjs';
+import { failureLine, publishReview, runReviewProcess, settleReview, SKIP_MARKER } from '../scripts/lib/publish.mjs';
 import { buildReviewBody, buildShortBody, cleanReview, GITHUB_BODY_LIMIT } from '../scripts/lib/review-body.mjs';
 
 const httpError = (status) => Object.assign(new Error(`GitHub ${status}`), { status });
@@ -117,6 +117,32 @@ describe('settleReview', () => {
     assert.equal(await settleReview({ run, github: failedComment, log: (line) => failedLines.push(line) }), 1);
     assert.equal(failedLines.length, 2);
     assert.ok(!failedLines[1].includes('bez błędu') && failedLines[1].includes('kodem 1'));
+  });
+
+  it('logs an unrecognised error with the review secrets and token-shaped text redacted, in the review and at the top level', async () => {
+    const secret = 'tajny-klucz-1234567890';
+    const github = fakeGithub();
+    const lines = [];
+    const run = async () =>
+      Promise.reject(new Error(`request failed with x-api-key: ${secret} and sk-ant-api03-abcdefghijklmnop`));
+    assert.equal(await settleReview({ run, github, log: (line) => lines.push(line), secrets: [secret] }), 1);
+    assert.equal(lines.length, 1);
+    assert.ok(!lines[0].includes(secret));
+    assert.ok(!lines[0].includes('sk-ant-api03-abcdefghijklmnop'));
+    assert.ok(lines[0].includes('[ukryte]'));
+    assert.ok(lines[0].length <= 300);
+    assert.equal(github.calls.posted.length, 0);
+    const gatewayKey = 'vck_gateway-key-0987654321';
+    const topLines = [];
+    const main = async () =>
+      Promise.reject(new Error(`config failed: ${gatewayKey} ${Buffer.from(gatewayKey).toString('base64')}`));
+    const env = { AI_GATEWAY_API_KEY: gatewayKey, GH_TOKEN: 'token-1234567890' };
+    assert.equal(await runReviewProcess({ main, env, log: (line) => topLines.push(line) }), 1);
+    assert.equal(topLines.length, 1);
+    assert.ok(!topLines[0].includes(gatewayKey));
+    assert.ok(!topLines[0].includes(Buffer.from(gatewayKey).toString('base64')));
+    assert.ok(topLines[0].includes('[ukryte]'));
+    assert.throws(() => failureLine({ error: new Error(secret) }), TypeError);
   });
 });
 

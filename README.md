@@ -34,7 +34,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: kamilszczepanik/claude-pr-reviewer/.github/workflows/review.yml@1313a005734da1b79cea63a5001594c74efb94d7
+    uses: kamilszczepanik/claude-pr-reviewer/.github/workflows/review.yml@35d22497d9e40c59c9d2187a71c29c1960fa36a7
     with:
       pr-number: ${{ inputs.pr-number }}
     secrets:
@@ -55,10 +55,13 @@ siedmiu przeglądach). Głębszy przegląd: `model: claude-opus-5-5` w `with:`.
 
 Wołający przypina pełny SHA commita, nie tag: praca dostaje `ANTHROPIC_API_KEY` i token z `pull-requests: write`, więc
 kod pod przypięciem nie może się zmienić bez śladu w wołającym repo. Ekosystem `github-actions` w `dependabot.yml`
-wołającego podbija SHA przy nowym wydaniu.
+wołającego podbija SHA przy nowym wydaniu. W tym repozytorium każdy `uses:` też jest pełnym SHA: akcje zewnętrzne
+podbija Dependabot (`.github/dependabot.yml`), a przypięcia do samego recenzenta podbija rutyna wydania (sekcja „Tagi
+i wydanie”), więc Dependabot je pomija.
 
 | Wersja   | SHA                                        |
 | -------- | ------------------------------------------ |
+| `v1.4.1` | `35d22497d9e40c59c9d2187a71c29c1960fa36a7` |
 | `v1.4.0` | `1313a005734da1b79cea63a5001594c74efb94d7` |
 | `v1.3.0` | `725b78491692931764120191d62166f253e470a6` |
 | `v1.2.0` | `ba77aed05eb571e266c481bc044291f0ad0bfd14` |
@@ -84,7 +87,7 @@ Sekrety: `ANTHROPIC_API_KEY` i `AI_GATEWAY_API_KEY`, oba opcjonalne. Wołający 
 `secrets: inherit`). Bez obu przegląd jest pominięty z komentarzem, bez czerwonego checka. Klucz trafia wyłącznie do procesu Agent SDK (biała lista
 zmiennych środowiska: klucz, `PATH`, `HOME`, locale, katalog tymczasowy, proxy); `GITHUB_TOKEN` zostaje w procesie
 skryptu i nie trafia do modelu. Ani klucz, ani token, ani ich zapis base64, ani nic, co wygląda jak klucz Anthropic
-albo token GitHuba, nie przechodzi do publikowanego tekstu i do logu.
+albo token GitHuba, nie przechodzi do publikowanego tekstu i do logu. To samo dotyczy linii nieoczekiwanego błędu.
 
 Uprawnienia: `contents: read` i `pull-requests: write` na `GITHUB_TOKEN` wołającego repo. Checkout PR-a idzie
 z `persist-credentials: false`.
@@ -98,10 +101,10 @@ pominięciu. Nie wypycha commitów, nie zmienia etykiet, nie zamyka wątków.
 ## Jak to działa
 
 - `.github/workflows/review.yml` ustala PR jednym wywołaniem API (head i repo heada), sprawdza head i woła akcję
-  `kamilszczepanik/claude-pr-reviewer@v<wersja>` z tego repozytorium. `GITHUB_TOKEN` wołającego repo nie czyta
+  `kamilszczepanik/claude-pr-reviewer@<SHA>` z tego repozytorium. `GITHUB_TOKEN` wołającego repo nie czyta
   prywatnego repo recenzenta, więc kod recenzenta przychodzi jako akcja, którą runner pobiera sam. Akcja jest
-  przypięta do tagu własnej wersji (`package.json`), więc workflow przypięty do `v1.x.y` uruchamia skrypty z tego
-  samego wydania; pilnuje tego `test/release.test.mjs`.
+  przypięta do SHA commita z kodem tego samego wydania, nie do tagu, więc przesunięcie tagu nie zmienia kodu, który
+  dostaje klucz; `test/release.test.mjs` pilnuje, że kod pod przypięciem jest taki sam jak w drzewie.
 - `scripts/review.mjs` pobiera diff `compare/<base>...<head>` dla tego samego `head.sha`, który sprawdził checkout,
   więc numery linii zgadzają się z plikami czytanymi przez model. Diff tnie do `max-diff-bytes` na granicy pliku,
   wypełniając limit od najmniejszych plików, żeby jeden duży plik (lockfile, fixture) nie wypchnął zmian w kodzie.
@@ -144,7 +147,7 @@ pominięciu. Nie wypycha commitów, nie zmienia etykiet, nie zamyka wątków.
   (czerwony check, bez komentarza), bo skrypt nawet nie rusza.
 - `ready_for_review` uruchamia przegląd przy każdym przejściu ze szkicu do gotowego, a `concurrency` tylko
   szereguje przebiegi, nie usuwa powtórzeń: każde przełączenie to nowy płatny przegląd. Sufitem jest
-  `max-budget-usd` na przebieg i limit wydatków workspace'u.
+  `max-budget-usd` na przebieg i kredyt API.
 - Hak granicy repozytorium warto potwierdzić na żywo: pierwszy przegląd testowy pokazuje w logu „odmowy narzędzi 0”
   na zwykłym PR-ze.
 
@@ -160,7 +163,7 @@ Każde uruchomienie to nowy przegląd i nowy koszt.
 
 ## Kredyt API
 
-Płaci kredyt API z org „Kamil's Individual Org”, workspace `ci-review` z własnym limitem wydatków: 200 USD
+Płaci kredyt API z org „Kamil's Individual Org”, workspace Default, bez osobnego limitu wydatków: 200 USD
 miesięcznie w planie Max, odnawia się 26. dnia miesiąca, niewykorzystany przepada, a po wyczerpaniu żądania stają do
 odnowienia (twardy stop, bez karty i bez auto-reload). Przy wyczerpanym kredycie przegląd idzie bramką AI, gdy jest
 jej klucz; bez klucza zostaje komentarz „pominięty” zamiast czerwonego checka.
@@ -189,29 +192,35 @@ godzimy, bo kod nie niesie danych osobowych.
 ## Klucz API
 
 Sekret `ANTHROPIC_API_KEY` w każdym wołającym repozytorium ustawia właściciel ręcznie. Klucz tworzymy wewnątrz
-workspace `ci-review` i sprawdzamy żądaniem na jeden token, bo prefiks klucza nie zdradza, czy ma workspace. Obrót:
+workspace'u Default i sprawdzamy żądaniem na jeden token, bo prefiks klucza nie zdradza, czy ma workspace. Obrót:
 nowy klucz w Console, podmiana sekretu w każdym repozytorium (`gh secret set ANTHROPIC_API_KEY --repo <owner>/<repo>`),
 ręczne ponowienie przeglądu na dowolnym PR-ze, dopiero potem wyłączenie starego klucza.
 
 ## Tagi i wydanie
 
-`v1` to tag ruchomy w obrębie wersji głównej, a każde wydanie dostaje stały tag `v1.x.y`. Wołające repozytoria
-przypinają SHA (sekcja „Przypięcie”), więc nowe wydanie dociera do nich PR-em Dependabota albo ręczną zmianą SHA. Zmiana niezgodna wstecz (wejścia, sekrety, uprawnienia) to
-`v2`. Wydanie:
+`v1` stoi na `v1.4.0` (`1313a005`) i już się nie przesuwa: nikt go nie używa, a ruchomy tag wymagał force-pushu.
+Każde wydanie dostaje stały tag `v1.x.y`, wysyłany zwykłym pushem; force-pushu w tym repozytorium nie ma. Wołające
+repozytoria przypinają SHA (sekcja „Przypięcie”), więc nowe wydanie dociera do nich PR-em Dependabota albo ręczną
+zmianą SHA. Zmiana niezgodna wstecz (wejścia, sekrety, uprawnienia) to `v2`.
 
-1. Podnieś `version` w `package.json` (i `package-lock.json`) oraz tag akcji w `.github/workflows/review.yml`
-   (`uses: kamilszczepanik/claude-pr-reviewer@v1.x.y`); `npm test` pilnuje, że są równe.
-2. Commit, potem utwórz i wyślij na origin stały tag `v1.x.y`, a dopiero po nim przesuń `v1` na ten sam commit
-   (`git tag -f v1` i wysłanie z `-f`). Kolejność ma znaczenie: `v1` przesunięty przed stałym tagiem wskazywałby
-   akcję pod tagiem, którego jeszcze nie ma. To jedyny dopuszczony force-push w tym repozytorium: `v1` jest tagiem
-   ruchomym z definicji, a stałe tagi `v1.x.y` nigdy się nie przesuwają.
-3. Dopisz wiersz do tabeli w „Przypięcie”.
-4. Przegląd tego repozytorium (`claude-review.yml`) przypina SHA poprzedniego wydania, bo commit wydania nie może
-   zawierać własnego SHA; podbij go w tym samym PR-ze co wiersz tabeli z kroku 3.
+PR, który zmienia `action.yml`, `scripts/`, `package.json` albo `package-lock.json`, jest wydaniem: `npm test`
+sprawdza, że kod pod przypięciem akcji i pod przypięciem przeglądu własnego jest taki sam jak w drzewie. Wydanie to
+trzy ostatnie commity PR-a, w tej kolejności:
+
+1. Kod i `version` w `package.json` oraz `package-lock.json` (`npm version 1.x.y --no-git-tag-version`). Ten commit
+   to SHA akcji.
+2. `.github/workflows/review.yml`: krok `Review with Claude` woła
+   `kamilszczepanik/claude-pr-reviewer@<SHA commita 1> # v1.x.y`. Ten commit to SHA wydania.
+3. SHA wydania w przykładzie „Jak wołać”, nowy wiersz na górze tabeli w „Przypięcie” i `uses:` w
+   `.github/workflows/claude-review.yml`, więc PR wydania przegląda już nowy łańcuch przypięć.
+
+Poprawka kodu po commicie 2 powtarza kroki 2 i 3. PR scalamy wyłącznie zwykłym merge'em (`gh pr merge --merge`):
+squash i rebase zmieniają SHA i osierocają przypięcia. Po scaleniu `git tag v1.x.y <SHA wydania>` i
+`git push origin v1.x.y`.
 
 ## Rozwój
 
 Node 22, czysty ESM, zależności przypięte do dokładnych wersji. `npm test` uruchamia `node --test` na czystej logice:
 mapowanie linii diffu, obcinanie, walidacja wyniku, wybór komunikatu przy błędzie API, sanityzacja i limity długości,
-publikacja z cofaniem po 422, wyjście 0 przy pominięciu, granica repozytorium, rubryka z bazy, zgodność wersji akcji,
-wybór trasy i ponowienie przez bramkę, stronicowanie komentarzy.
+publikacja z cofaniem po 422, wyjście 0 przy pominięciu, granica repozytorium, rubryka z bazy, przypięcia po SHA i zgodność
+kodu pod przypięciem, wybór trasy i ponowienie przez bramkę, stronicowanie komentarzy.
