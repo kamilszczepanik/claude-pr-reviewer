@@ -37,7 +37,11 @@ const reportSkip = async ({ github, reason, detail, failsCheck, log }) => {
   }
 };
 
-export const failureLine = ({ error, secrets = [] }) => {
+const SECRET_ENV_NAMES = ['ANTHROPIC_API_KEY', 'AI_GATEWAY_API_KEY', 'GH_TOKEN'];
+
+const envSecrets = (env) => SECRET_ENV_NAMES.map((name) => env[name]).filter(Boolean);
+
+export const failureLine = ({ error, secrets }) => {
   const detail = HIDDEN_MESSAGE_ERRORS.has(error.name)
     ? 'treść ukryta'
     : apiErrorDetail({ text: String(error.message), secrets });
@@ -55,5 +59,14 @@ export const settleReview = async ({ run, github, log, secrets = [] }) => {
     }
     await reportSkip({ github, reason: error.skipReason, detail: error.skipDetail, failsCheck: error.failsCheck, log });
     return error.failsCheck ? 1 : 0;
+  }
+};
+
+export const runReviewProcess = async ({ main, env, log }) => {
+  try {
+    return await main();
+  } catch (error) {
+    log(failureLine({ error, secrets: envSecrets(env) }));
+    return 1;
   }
 };

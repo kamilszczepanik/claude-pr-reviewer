@@ -4,7 +4,7 @@ import { rightLinesByPath, truncateDiff } from './lib/diff.mjs';
 import { skipError } from './lib/failure.mjs';
 import { createGithub } from './lib/github.mjs';
 import { buildPrompt, readRubric, SYSTEM_PROMPT } from './lib/prompt.mjs';
-import { failureLine, publishReview, settleReview } from './lib/publish.mjs';
+import { publishReview, runReviewProcess, settleReview } from './lib/publish.mjs';
 import { buildReviewBody, buildShortBody, cleanReview, toInlineComment } from './lib/review-body.mjs';
 import { selectComments } from './lib/review-result.mjs';
 import { firstRoute, ROUTE_LABELS, runRoutedReview } from './lib/routes.mjs';
@@ -109,9 +109,4 @@ const main = async () => {
   return settleReview({ run: () => reviewPullRequest({ config, github, secrets }), github, log, secrets });
 };
 
-try {
-  process.exitCode = await main();
-} catch (error) {
-  console.error(failureLine({ error }));
-  process.exitCode = 1;
-}
+process.exitCode = await runReviewProcess({ main, env: process.env, log: (line) => console.error(line) });
