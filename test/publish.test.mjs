@@ -143,7 +143,12 @@ describe('settleReview', () => {
     assert.ok(!topLines[0].includes(Buffer.from(gatewayKey).toString('base64')));
     assert.ok(topLines[0].includes('[ukryte]'));
     assert.throws(() => failureLine({ error: new Error(secret) }), TypeError);
-    for (const thrown of [null, undefined, `config failed: ${gatewayKey}`]) {
+    const unprintable = {
+      toString: () => {
+        throw new Error(gatewayKey);
+      },
+    };
+    for (const thrown of [null, undefined, `config failed: ${gatewayKey}`, Object.create(null), unprintable]) {
       const thrownLines = [];
       const throwing = async () => Promise.reject(thrown);
       assert.equal(await runReviewProcess({ main: throwing, env, log: (line) => thrownLines.push(line) }), 1);

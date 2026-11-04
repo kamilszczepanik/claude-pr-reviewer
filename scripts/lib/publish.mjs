@@ -41,7 +41,17 @@ const SECRET_ENV_NAMES = ['ANTHROPIC_API_KEY', 'AI_GATEWAY_API_KEY', 'GH_TOKEN']
 
 const envSecrets = (env) => SECRET_ENV_NAMES.map((name) => env[name]).filter(Boolean);
 
-const asError = (thrown) => (thrown instanceof Error ? thrown : new Error(String(thrown)));
+const UNREADABLE_THROWN = '<nieczytelna wartość>';
+
+const thrownText = (thrown) => {
+  try {
+    return String(thrown);
+  } catch {
+    return UNREADABLE_THROWN;
+  }
+};
+
+const asError = (thrown) => (thrown instanceof Error ? thrown : new Error(thrownText(thrown)));
 
 export const failureLine = ({ error: thrown, secrets }) => {
   const error = asError(thrown);
