@@ -23,7 +23,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: kamilszczepanik/claude-pr-reviewer/.github/workflows/review.yml@1313a005734da1b79cea63a5001594c74efb94d7
+    uses: kamilszczepanik/claude-pr-reviewer/.github/workflows/review.yml@b235f1c38cf6988eb633cce1624f8f81558b06e8
     with:
       pr-number: ${{ inputs.pr-number }}
     secrets:
