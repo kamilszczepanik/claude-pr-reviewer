@@ -223,4 +223,5 @@ squash i rebase zmieniają SHA i osierocają przypięcia. Po scaleniu `git tag v
 Node 22, czysty ESM, zależności przypięte do dokładnych wersji. `npm test` uruchamia `node --test` na czystej logice:
 mapowanie linii diffu, obcinanie, walidacja wyniku, wybór komunikatu przy błędzie API, sanityzacja i limity długości,
 publikacja z cofaniem po 422, wyjście 0 przy pominięciu, granica repozytorium, rubryka z bazy, przypięcia po SHA i zgodność
-kodu pod przypięciem, wybór trasy i ponowienie przez bramkę, stronicowanie komentarzy.
+kodu pod przypięciem, wybór trasy i ponowienie przez bramkę, stronicowanie komentarzy. Testy przypięć potrzebują pełnej
+historii gita: w płytkim klonie najpierw `git fetch --unshallow` (CI pobiera ją przez `fetch-depth: 0`).

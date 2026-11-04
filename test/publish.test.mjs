@@ -143,6 +143,18 @@ describe('settleReview', () => {
     assert.ok(!topLines[0].includes(Buffer.from(gatewayKey).toString('base64')));
     assert.ok(topLines[0].includes('[ukryte]'));
     assert.throws(() => failureLine({ error: new Error(secret) }), TypeError);
+    for (const thrown of [null, undefined, `config failed: ${gatewayKey}`]) {
+      const thrownLines = [];
+      const throwing = async () => Promise.reject(thrown);
+      assert.equal(await runReviewProcess({ main: throwing, env, log: (line) => thrownLines.push(line) }), 1);
+      assert.equal(
+        await settleReview({ run: throwing, github, log: (line) => thrownLines.push(line), secrets: [gatewayKey] }),
+        1,
+      );
+      assert.equal(thrownLines.length, 2);
+      assert.ok(thrownLines.every((line) => line.startsWith('Przegląd Claude nie powiódł się: Error: ')));
+      assert.ok(thrownLines.every((line) => !line.includes(gatewayKey)));
+    }
   });
 });
 

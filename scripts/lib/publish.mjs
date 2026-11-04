@@ -41,7 +41,10 @@ const SECRET_ENV_NAMES = ['ANTHROPIC_API_KEY', 'AI_GATEWAY_API_KEY', 'GH_TOKEN']
 
 const envSecrets = (env) => SECRET_ENV_NAMES.map((name) => env[name]).filter(Boolean);
 
-export const failureLine = ({ error, secrets }) => {
+const asError = (thrown) => (thrown instanceof Error ? thrown : new Error(String(thrown)));
+
+export const failureLine = ({ error: thrown, secrets }) => {
+  const error = asError(thrown);
   const detail = HIDDEN_MESSAGE_ERRORS.has(error.name)
     ? 'treść ukryta'
     : apiErrorDetail({ text: String(error.message), secrets });
@@ -53,7 +56,7 @@ export const settleReview = async ({ run, github, log, secrets = [] }) => {
     await run();
     return 0;
   } catch (error) {
-    if (!error.skipReason) {
+    if (!error?.skipReason) {
       log(failureLine({ error, secrets }));
       return 1;
     }
