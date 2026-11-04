@@ -1,4 +1,5 @@
 import { MAX_LOG_CHARS } from './config.mjs';
+import { apiErrorDetail } from './failure.mjs';
 
 const UNPROCESSABLE = 422;
 const HIDDEN_MESSAGE_ERRORS = new Set(['SyntaxError', 'ZodError']);
@@ -36,18 +37,20 @@ const reportSkip = async ({ github, reason, detail, failsCheck, log }) => {
   }
 };
 
-export const failureLine = (error) => {
-  const detail = HIDDEN_MESSAGE_ERRORS.has(error.name) ? 'treść ukryta' : String(error.message);
+export const failureLine = ({ error, secrets = [] }) => {
+  const detail = HIDDEN_MESSAGE_ERRORS.has(error.name)
+    ? 'treść ukryta'
+    : apiErrorDetail({ text: String(error.message), secrets });
   return `Przegląd Claude nie powiódł się: ${error.name}: ${detail}`.slice(0, MAX_LOG_CHARS);
 };
 
-export const settleReview = async ({ run, github, log }) => {
+export const settleReview = async ({ run, github, log, secrets = [] }) => {
   try {
     await run();
     return 0;
   } catch (error) {
     if (!error.skipReason) {
-      log(failureLine(error));
+      log(failureLine({ error, secrets }));
       return 1;
     }
     await reportSkip({ github, reason: error.skipReason, detail: error.skipDetail, failsCheck: error.failsCheck, log });

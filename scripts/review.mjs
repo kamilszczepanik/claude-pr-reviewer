@@ -42,13 +42,12 @@ const reviewAttempts = ({ headSha, review, bodyInput }) => {
   ];
 };
 
-const reviewPullRequest = async ({ config, github }) => {
+const reviewPullRequest = async ({ config, github, secrets }) => {
   const route = firstRoute(config);
   const pullRequest = await github.pullRequest();
   const headSha = config.headSha ?? pullRequest.head.sha;
   const fullDiff = await fetchDiff({ github, baseSha: pullRequest.base.sha, headSha });
   const { diff, omittedFiles } = truncateDiff({ diff: fullDiff, maxBytes: config.maxDiffBytes });
-  const secrets = [config.apiKey, config.gatewayKey, config.githubToken].filter(Boolean);
   const rubric = await readRubric({ repoDir: config.repoDir, baseSha: pullRequest.base.sha });
   log(
     `Przegląd PR #${config.prNumber}: diff ${Buffer.byteLength(diff)} B, pominięte pliki ${omittedFiles.length}, rubryka z ${rubric.source}`,
@@ -106,12 +105,13 @@ const reviewPullRequest = async ({ config, github }) => {
 const main = async () => {
   const config = await readConfig(process.env);
   const github = createGithub({ token: config.githubToken, repo: config.repo, prNumber: config.prNumber, log });
-  return settleReview({ run: () => reviewPullRequest({ config, github }), github, log });
+  const secrets = [config.apiKey, config.gatewayKey, config.githubToken].filter(Boolean);
+  return settleReview({ run: () => reviewPullRequest({ config, github, secrets }), github, log, secrets });
 };
 
 try {
   process.exitCode = await main();
 } catch (error) {
-  console.error(failureLine(error));
+  console.error(failureLine({ error }));
   process.exitCode = 1;
 }

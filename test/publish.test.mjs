@@ -118,6 +118,21 @@ describe('settleReview', () => {
     assert.equal(failedLines.length, 2);
     assert.ok(!failedLines[1].includes('bez błędu') && failedLines[1].includes('kodem 1'));
   });
+
+  it('logs an unrecognised error with the review secrets and token-shaped text redacted', async () => {
+    const secret = 'tajny-klucz-1234567890';
+    const github = fakeGithub();
+    const lines = [];
+    const run = async () =>
+      Promise.reject(new Error(`request failed with x-api-key: ${secret} and sk-ant-api03-abcdefghijklmnop`));
+    assert.equal(await settleReview({ run, github, log: (line) => lines.push(line), secrets: [secret] }), 1);
+    assert.equal(lines.length, 1);
+    assert.ok(!lines[0].includes(secret));
+    assert.ok(!lines[0].includes('sk-ant-api03-abcdefghijklmnop'));
+    assert.ok(lines[0].includes('[ukryte]'));
+    assert.ok(lines[0].length <= 300);
+    assert.equal(github.calls.posted.length, 0);
+  });
 });
 
 describe('review body', () => {
