@@ -34,7 +34,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: kamilszczepanik/claude-pr-reviewer/.github/workflows/review.yml@ebbe965c87415619ffe073f891704428e60b47d7
+    uses: kamilszczepanik/claude-pr-reviewer/.github/workflows/review.yml@2d24e5d68433b0e014ee1c7ade9207acb8bc587e
     with:
       pr-number: ${{ inputs.pr-number }}
     secrets:
@@ -61,7 +61,7 @@ i wydanie”), więc Dependabot je pomija.
 
 | Wersja   | SHA                                        |
 | -------- | ------------------------------------------ |
-| `v1.4.1` | `ebbe965c87415619ffe073f891704428e60b47d7` |
+| `v1.4.1` | `2d24e5d68433b0e014ee1c7ade9207acb8bc587e` |
 | `v1.4.0` | `1313a005734da1b79cea63a5001594c74efb94d7` |
 | `v1.3.0` | `725b78491692931764120191d62166f253e470a6` |
 | `v1.2.0` | `ba77aed05eb571e266c481bc044291f0ad0bfd14` |
