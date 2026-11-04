@@ -34,7 +34,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: kamilszczepanik/claude-pr-reviewer/.github/workflows/review.yml@35d22497d9e40c59c9d2187a71c29c1960fa36a7
+    uses: kamilszczepanik/claude-pr-reviewer/.github/workflows/review.yml@2d24e5d68433b0e014ee1c7ade9207acb8bc587e
     with:
       pr-number: ${{ inputs.pr-number }}
     secrets:
@@ -61,7 +61,7 @@ i wydanie”), więc Dependabot je pomija.
 
 | Wersja   | SHA                                        |
 | -------- | ------------------------------------------ |
-| `v1.4.1` | `35d22497d9e40c59c9d2187a71c29c1960fa36a7` |
+| `v1.4.1` | `2d24e5d68433b0e014ee1c7ade9207acb8bc587e` |
 | `v1.4.0` | `1313a005734da1b79cea63a5001594c74efb94d7` |
 | `v1.3.0` | `725b78491692931764120191d62166f253e470a6` |
 | `v1.2.0` | `ba77aed05eb571e266c481bc044291f0ad0bfd14` |
@@ -223,4 +223,5 @@ squash i rebase zmieniają SHA i osierocają przypięcia. Po scaleniu `git tag v
 Node 22, czysty ESM, zależności przypięte do dokładnych wersji. `npm test` uruchamia `node --test` na czystej logice:
 mapowanie linii diffu, obcinanie, walidacja wyniku, wybór komunikatu przy błędzie API, sanityzacja i limity długości,
 publikacja z cofaniem po 422, wyjście 0 przy pominięciu, granica repozytorium, rubryka z bazy, przypięcia po SHA i zgodność
-kodu pod przypięciem, wybór trasy i ponowienie przez bramkę, stronicowanie komentarzy.
+kodu pod przypięciem, wybór trasy i ponowienie przez bramkę, stronicowanie komentarzy. Testy przypięć potrzebują pełnej
+historii gita: w płytkim klonie najpierw `git fetch --unshallow` (CI pobiera ją przez `fetch-depth: 0`).
