@@ -84,7 +84,7 @@ Sekrety: `ANTHROPIC_API_KEY` i `AI_GATEWAY_API_KEY`, oba opcjonalne. Wołający 
 `secrets: inherit`). Bez obu przegląd jest pominięty z komentarzem, bez czerwonego checka. Klucz trafia wyłącznie do procesu Agent SDK (biała lista
 zmiennych środowiska: klucz, `PATH`, `HOME`, locale, katalog tymczasowy, proxy); `GITHUB_TOKEN` zostaje w procesie
 skryptu i nie trafia do modelu. Ani klucz, ani token, ani ich zapis base64, ani nic, co wygląda jak klucz Anthropic
-albo token GitHuba, nie przechodzi do publikowanego tekstu i do logu.
+albo token GitHuba, nie przechodzi do publikowanego tekstu i do logu. To samo dotyczy linii nieoczekiwanego błędu.
 
 Uprawnienia: `contents: read` i `pull-requests: write` na `GITHUB_TOKEN` wołającego repo. Checkout PR-a idzie
 z `persist-credentials: false`.
@@ -144,7 +144,7 @@ pominięciu. Nie wypycha commitów, nie zmienia etykiet, nie zamyka wątków.
   (czerwony check, bez komentarza), bo skrypt nawet nie rusza.
 - `ready_for_review` uruchamia przegląd przy każdym przejściu ze szkicu do gotowego, a `concurrency` tylko
   szereguje przebiegi, nie usuwa powtórzeń: każde przełączenie to nowy płatny przegląd. Sufitem jest
-  `max-budget-usd` na przebieg i limit wydatków workspace'u.
+  `max-budget-usd` na przebieg i kredyt API.
 - Hak granicy repozytorium warto potwierdzić na żywo: pierwszy przegląd testowy pokazuje w logu „odmowy narzędzi 0”
   na zwykłym PR-ze.
 
@@ -160,7 +160,7 @@ Każde uruchomienie to nowy przegląd i nowy koszt.
 
 ## Kredyt API
 
-Płaci kredyt API z org „Kamil's Individual Org”, workspace `ci-review` z własnym limitem wydatków: 200 USD
+Płaci kredyt API z org „Kamil's Individual Org”, workspace Default, bez osobnego limitu wydatków: 200 USD
 miesięcznie w planie Max, odnawia się 26. dnia miesiąca, niewykorzystany przepada, a po wyczerpaniu żądania stają do
 odnowienia (twardy stop, bez karty i bez auto-reload). Przy wyczerpanym kredycie przegląd idzie bramką AI, gdy jest
 jej klucz; bez klucza zostaje komentarz „pominięty” zamiast czerwonego checka.
@@ -189,7 +189,7 @@ godzimy, bo kod nie niesie danych osobowych.
 ## Klucz API
 
 Sekret `ANTHROPIC_API_KEY` w każdym wołającym repozytorium ustawia właściciel ręcznie. Klucz tworzymy wewnątrz
-workspace `ci-review` i sprawdzamy żądaniem na jeden token, bo prefiks klucza nie zdradza, czy ma workspace. Obrót:
+workspace'u Default i sprawdzamy żądaniem na jeden token, bo prefiks klucza nie zdradza, czy ma workspace. Obrót:
 nowy klucz w Console, podmiana sekretu w każdym repozytorium (`gh secret set ANTHROPIC_API_KEY --repo <owner>/<repo>`),
 ręczne ponowienie przeglądu na dowolnym PR-ze, dopiero potem wyłączenie starego klucza.
 
