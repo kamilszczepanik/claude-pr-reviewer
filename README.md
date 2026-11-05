@@ -38,7 +38,7 @@ jobs:
     with:
       pr-number: ${{ inputs.pr-number }}
     secrets:
-      ANTHROPIC_API_KEY: ${{ vars.CLAUDE_REVIEW_ROUTE != 'gateway' && (vars.CLAUDE_REVIEW_ROUTE == 'asystent' && secrets.ANTHROPIC_API_KEY_ASYSTENT || secrets.ANTHROPIC_API_KEY) || '' }}
+      ANTHROPIC_API_KEY: ${{ vars.CLAUDE_REVIEW_ROUTE == 'asystent' && secrets.ANTHROPIC_API_KEY_ASYSTENT || ((vars.CLAUDE_REVIEW_ROUTE == 'individual' || vars.CLAUDE_REVIEW_ROUTE == '') && secrets.ANTHROPIC_API_KEY) || '' }}
       AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
 ```
 
@@ -201,7 +201,8 @@ Trasę wybiera zmienna repozytorium `CLAUDE_REVIEW_ROUTE`, bez zmiany kodu i bez
 
 Wszystko naraz (zmienna w czterech repozytoriach, lokalne `.env` i pliki evali) przełącza
 `~/workspace/.secrets/use-claude-org <asystent|individual|gateway>`, a bez argumentu pokazuje aktywną trasę. Gałąź ze starym
-wołającym czyta `ANTHROPIC_API_KEY`, dopóki nie dostanie selektora. Klucz tworzymy wewnątrz workspace'u Default
+wołającym czyta `ANTHROPIC_API_KEY`, dopóki nie dostanie selektora. Literówka w zmiennej albo pusty sekret trasy daje pusty klucz, czyli
+bramkę, a linia stanu recenzji nazywa trasę. Klucz tworzymy wewnątrz workspace'u Default
 i sprawdzamy żądaniem na jeden token, bo prefiks klucza nie zdradza, czy ma workspace. Obrót: nowy klucz w Console, podmiana
 sekretu danej trasy w każdym repozytorium (`gh secret set <nazwa> --repo <owner>/<repo>`), ręczne ponowienie przeglądu na
 dowolnym PR-ze, dopiero potem wyłączenie starego klucza.
