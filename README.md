@@ -38,7 +38,7 @@ jobs:
     with:
       pr-number: ${{ inputs.pr-number }}
     secrets:
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ vars.CLAUDE_REVIEW_ROUTE != 'gateway' && (vars.CLAUDE_REVIEW_ROUTE == 'asystent' && secrets.ANTHROPIC_API_KEY_ASYSTENT || secrets.ANTHROPIC_API_KEY) || '' }}
       AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
 ```
 
@@ -163,9 +163,9 @@ Każde uruchomienie to nowy przegląd i nowy koszt.
 
 ## Kredyt API
 
-Płaci kredyt API z org „Kamil's Individual Org”, workspace Default, bez osobnego limitu wydatków: 200 USD
-miesięcznie w planie Max, odnawia się 26. dnia miesiąca, niewykorzystany przepada, a po wyczerpaniu żądania stają do
-odnowienia (twardy stop, bez karty i bez auto-reload). Przy wyczerpanym kredycie przegląd idzie bramką AI, gdy jest
+Płaci kredyt API tej org, którą wskazuje zmienna `CLAUDE_REVIEW_ROUTE` (sekcja „Klucz API”): org `asystent`, 100 USD
+miesięcznie, albo „Kamil's Individual Org”, 200 USD miesięcznie, odnawiane 26. dnia miesiąca. Niewykorzystany kredyt
+przepada, a po wyczerpaniu żądania stają do odnowienia (twardy stop, bez karty i bez auto-reload). Przy wyczerpanym kredycie przegląd idzie bramką AI, gdy jest
 jej klucz; bez klucza zostaje komentarz „pominięty” zamiast czerwonego checka.
 
 ## Trasa zapasowa: bramka AI
@@ -191,10 +191,20 @@ godzimy, bo kod nie niesie danych osobowych.
 
 ## Klucz API
 
-Sekret `ANTHROPIC_API_KEY` w każdym wołającym repozytorium ustawia właściciel ręcznie. Klucz tworzymy wewnątrz
-workspace'u Default i sprawdzamy żądaniem na jeden token, bo prefiks klucza nie zdradza, czy ma workspace. Obrót:
-nowy klucz w Console, podmiana sekretu w każdym repozytorium (`gh secret set ANTHROPIC_API_KEY --repo <owner>/<repo>`),
-ręczne ponowienie przeglądu na dowolnym PR-ze, dopiero potem wyłączenie starego klucza.
+Trasę wybiera zmienna repozytorium `CLAUDE_REVIEW_ROUTE`, bez zmiany kodu i bez nadpisywania sekretu:
+
+| Wartość                  | Klucz                        | Kto płaci               |
+| ------------------------ | ---------------------------- | ----------------------- |
+| `asystent`               | `ANTHROPIC_API_KEY_ASYSTENT` | org `asystent`          |
+| `individual` albo brak   | `ANTHROPIC_API_KEY`          | Kamil's Individual Org  |
+| `gateway`                | `AI_GATEWAY_API_KEY`         | klucz Vercel AI Gateway |
+
+Wszystko naraz (zmienna w czterech repozytoriach, lokalne `.env` i pliki evali) przełącza
+`~/workspace/.secrets/use-claude-org <asystent|individual|gateway>`, a bez argumentu pokazuje aktywną trasę. Gałąź ze starym
+wołającym czyta `ANTHROPIC_API_KEY`, dopóki nie dostanie selektora. Klucz tworzymy wewnątrz workspace'u Default
+i sprawdzamy żądaniem na jeden token, bo prefiks klucza nie zdradza, czy ma workspace. Obrót: nowy klucz w Console, podmiana
+sekretu danej trasy w każdym repozytorium (`gh secret set <nazwa> --repo <owner>/<repo>`), ręczne ponowienie przeglądu na
+dowolnym PR-ze, dopiero potem wyłączenie starego klucza.
 
 ## Tagi i wydanie
 
