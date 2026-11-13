@@ -1,12 +1,22 @@
 # claude-pr-reviewer
 
-Wspólny przegląd pull requestów przez Claude na kredycie API (Agent SDK, nie Claude Code GitHub Action, bo kredyt
-API nie pokrywa Claude Code). Każdy PR dostaje po otwarciu albo po „Ready for review” jeden przegląd: komentarze
-w linii i krótkie podsumowanie z linią stanu (trasa, model, tury, tokeny, ewentualne obcięcie diffu).
+A pull request reviewer powered by Claude. It runs in GitHub Actions on the
+[Claude Agent SDK](https://docs.anthropic.com/en/docs/claude-code/sdk), reads the diff and the surrounding code, and
+posts one review with inline comments and a short summary.
 
-## Jak wołać
+- **What it does:** one review per pull request, when it opens or leaves draft. Comments only, never approves or
+  blocks a merge.
+- **Cost:** about $0.10 to $0.50 per review on Claude Sonnet (usually $0.30 to $0.50, measured over seven reviews),
+  with a hard cap per run (`max-budget-usd`, default $2).
+- **Fallback:** when the Anthropic API credit or usage limit runs out, the review retries once through
+  [Vercel AI Gateway](https://vercel.com/ai-gateway) and says which route it took.
+- **Safety:** the model can only read the checked-out repository, secrets never reach the model or the published
+  text, and every `uses:` is pinned to a full commit SHA.
 
-W repozytorium, które ma dostać przegląd, plik `.github/workflows/claude-review.yml`:
+## Quick start
+
+1. Add an `ANTHROPIC_API_KEY` secret to your repository (optionally also `AI_GATEWAY_API_KEY` for the fallback).
+2. Add `.github/workflows/claude-review.yml`:
 
 ```yaml
 name: Claude review
@@ -17,7 +27,7 @@ on:
   workflow_dispatch:
     inputs:
       pr-number:
-        description: Numer PR do ponownego przeglądu
+        description: PR number to review again
         required: true
         type: string
 
@@ -38,28 +48,22 @@ jobs:
     with:
       pr-number: ${{ inputs.pr-number }}
     secrets:
-      ANTHROPIC_API_KEY: ${{ vars.CLAUDE_REVIEW_ROUTE == 'asystent' && secrets.ANTHROPIC_API_KEY_ASYSTENT || ((vars.CLAUDE_REVIEW_ROUTE == 'individual' || vars.CLAUDE_REVIEW_ROUTE == '') && secrets.ANTHROPIC_API_KEY) || '' }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
 ```
 
-Sekret `AI_GATEWAY_API_KEY` jest opcjonalny: bez niego przegląd idzie tylko kredytem API (sekcja „Trasa zapasowa: bramka AI”).
+Only the review job gets `pull-requests: write`; the workflow level stays at `contents: read`. The `if` skips drafts
+(the review comes on "Ready for review") and pull requests from forks, which do not receive secrets.
 
-Uprawnienie `pull-requests: write` dostaje tylko ta jedna praca; poziom workflowu zostaje przy `contents: read`, żeby
-dopisana później praca go nie odziedziczyła. Warunek `if` pomija szkice (przegląd przychodzi przy „Ready for review”)
-i PR-y z forków, które nie dostają sekretów; `concurrency` szereguje przebiegi jednego PR-a.
+For a deeper review, pass `model: claude-opus-5-5` under `with:`.
 
-Model: domyślnie `claude-sonnet-5-5` (przegląd typowego PR-a około 0,10–0,50 USD, zwykle 0,30–0,50; pomiar z 3.11 na
-siedmiu przeglądach). Głębszy przegląd: `model: claude-opus-5-5` w `with:`.
+## Pinning
 
-## Przypięcie
+Callers pin a full commit SHA, not a tag: the job receives an API key and a token with `pull-requests: write`, so the
+code behind the pin must not change without a visible change in the caller. Add the `github-actions` ecosystem to the
+caller's `dependabot.yml` to get a pull request for each new release.
 
-Wołający przypina pełny SHA commita, nie tag: praca dostaje `ANTHROPIC_API_KEY` i token z `pull-requests: write`, więc
-kod pod przypięciem nie może się zmienić bez śladu w wołającym repo. Ekosystem `github-actions` w `dependabot.yml`
-wołającego podbija SHA przy nowym wydaniu. W tym repozytorium każdy `uses:` też jest pełnym SHA: akcje zewnętrzne
-podbija Dependabot (`.github/dependabot.yml`), a przypięcia do samego recenzenta podbija rutyna wydania (sekcja „Tagi
-i wydanie”), więc Dependabot je pomija.
-
-| Wersja   | SHA                                        |
+| Version  | SHA                                        |
 | -------- | ------------------------------------------ |
 | `v1.4.1` | `2d24e5d68433b0e014ee1c7ade9207acb8bc587e` |
 | `v1.4.0` | `1313a005734da1b79cea63a5001594c74efb94d7` |
@@ -68,171 +72,78 @@ i wydanie”), więc Dependabot je pomija.
 | `v1.1.1` | `794dfb62ff44b703a756b854a39de03e369caa44` |
 | `v1.1.0` | `9ad909a21e759e6ae14e607beafb2d2297c1ac1a` |
 
-Wołający: `asystent`, `platero-ai`, `dg-cars` i to repozytorium (`.github/workflows/claude-review.yml`, przegląd własnych PR-ów).
+## Inputs
 
-## Kontrakt
+All inputs of the reusable workflow (`workflow_call`) are optional:
 
-Wejścia (`workflow_call`), wszystkie opcjonalne:
+| Input            | Type   | Default                       | Meaning                                                              |
+| ---------------- | ------ | ----------------------------- | -------------------------------------------------------------------- |
+| `model`          | string | `claude-sonnet-5-5`           | Claude model id                                                      |
+| `max-comments`   | number | 15                            | maximum inline comments; the rest are counted in the summary         |
+| `max-diff-bytes` | number | 150000                        | diff size sent to the model, cut at file boundaries, smallest first  |
+| `max-budget-usd` | number | 2                             | hard cost cap of one review; above it the review is skipped          |
+| `pr-number`      | string | empty                         | pull request number for a manual rerun; digits only                  |
+| `gateway-model`  | string | `anthropic/claude-sonnet-5.5` | model id on the AI Gateway route                                     |
 
-| Wejście          | Typ    | Domyślnie           | Znaczenie                                                                       |
-| ---------------- | ------ | ------------------- | ------------------------------------------------------------------------------- |
-| `model`          | string | `claude-sonnet-5-5` | identyfikator modelu                                                            |
-| `max-comments`   | number | 15                  | najwięcej uwag w linii; reszta jest liczona w podsumowaniu                      |
-| `max-diff-bytes` | number | 150000              | rozmiar diffu dla modelu, cięty na granicy pliku, najmniejsze pliki pierwsze    |
-| `max-budget-usd` | number | 2                   | twardy sufit kosztu jednego przeglądu; po przekroczeniu przegląd jest pominięty |
-| `pr-number`      | string | puste               | numer PR przy ręcznym ponowieniu; tylko cyfry, inaczej praca kończy się błędem  |
-| `gateway-model`  | string | `anthropic/claude-sonnet-5.5` | identyfikator modelu na trasie bramki AI                              |
+Secrets: `ANTHROPIC_API_KEY` and `AI_GATEWAY_API_KEY`, both optional, passed explicitly (not `secrets: inherit`).
+With neither, the review is skipped with a comment and no red check.
 
-Sekrety: `ANTHROPIC_API_KEY` i `AI_GATEWAY_API_KEY`, oba opcjonalne. Wołający przekazuje je jawnie (nie
-`secrets: inherit`). Bez obu przegląd jest pominięty z komentarzem, bez czerwonego checka. Klucz trafia wyłącznie do procesu Agent SDK (biała lista
-zmiennych środowiska: klucz, `PATH`, `HOME`, locale, katalog tymczasowy, proxy); `GITHUB_TOKEN` zostaje w procesie
-skryptu i nie trafia do modelu. Ani klucz, ani token, ani ich zapis base64, ani nic, co wygląda jak klucz Anthropic
-albo token GitHuba, nie przechodzi do publikowanego tekstu i do logu. To samo dotyczy linii nieoczekiwanego błędu.
+## How it works
 
-Uprawnienia: `contents: read` i `pull-requests: write` na `GITHUB_TOKEN` wołającego repo. Checkout PR-a idzie
-z `persist-credentials: false`.
+- `.github/workflows/review.yml` resolves the pull request, checks out its head with `persist-credentials: false`
+  and calls the action in this repository, pinned to the commit that holds the release code.
+- `scripts/review.mjs` fetches the diff for the same head SHA, so line numbers match the files the model reads. A
+  large lockfile or fixture cannot push code changes out of the budget: files are added smallest first, and the review
+  lists the files it did not cover.
+- The rubric is `CLAUDE.md` and `AGENTS.md` from the base commit, so a pull request cannot weaken the rules that
+  judge it.
+- The Agent SDK runs with `Read`, `Grep` and `Glob` only, no settings from disk (hooks in the pull request do not
+  run), a turn limit, a time limit and the budget cap. A `PreToolUse` hook rejects any path outside the repository,
+  including through symlinks. The result is JSON validated against a schema.
+- Before publishing, the text is cleaned: secrets and anything shaped like an Anthropic key or GitHub token are
+  redacted, `@mentions` are disarmed, images and HTML are removed, and lengths are capped. Comments outside the diff
+  are dropped. If GitHub rejects inline comments, the review falls back to a summary with the comments in the body.
+- Expected failures (exhausted credit, rate limits, rejected key, API outage, timeout, budget) post a "review
+  skipped" comment and exit 0. Unexplained API errors and bugs exit 1.
 
-Co recenzent robi w repozytorium: wyłącznie czyta. Model ma tylko `Read`, `Grep` i `Glob`, a hak `PreToolUse`
-odrzuca każdą ścieżkę poza sprawdzonym repozytorium, także przez dowiązanie symboliczne. Skrypt publikuje najwyżej
-jedną rzecz na przebieg: recenzję `event: COMMENT` (nigdy `APPROVE` ani `REQUEST_CHANGES`, więc nie blokuje i nie
-zatwierdza scalenia) albo komentarz „Przegląd Claude pominięty: <powód>”, aktualizowany w miejscu przy kolejnym
-pominięciu. Nie wypycha commitów, nie zmienia etykiet, nie zamyka wątków.
+## Fallback route: Vercel AI Gateway
 
-## Jak to działa
+When the Anthropic API answers with exhausted credit (402) or an exhausted usage limit, the reviewer reruns the whole
+review once through Vercel AI Gateway (`ANTHROPIC_BASE_URL=https://ai-gateway.vercel.sh/claude-code`). Without
+`ANTHROPIC_API_KEY` but with a gateway key, it goes straight to the gateway. The cost is the same on both routes,
+since both bill the same tokens of the same model at list price, and the review's status line names the route.
 
-- `.github/workflows/review.yml` ustala PR jednym wywołaniem API (head i repo heada), sprawdza head i woła akcję
-  `kamilszczepanik/claude-pr-reviewer@<SHA>` z tego repozytorium. `GITHUB_TOKEN` wołającego repo nie czyta
-  prywatnego repo recenzenta, więc kod recenzenta przychodzi jako akcja, którą runner pobiera sam. Akcja jest
-  przypięta do SHA commita z kodem tego samego wydania, nie do tagu, więc przesunięcie tagu nie zmienia kodu, który
-  dostaje klucz; `test/release.test.mjs` pilnuje, że kod pod przypięciem jest taki sam jak w drzewie.
-- `scripts/review.mjs` pobiera diff `compare/<base>...<head>` dla tego samego `head.sha`, który sprawdził checkout,
-  więc numery linii zgadzają się z plikami czytanymi przez model. Diff tnie do `max-diff-bytes` na granicy pliku,
-  wypełniając limit od najmniejszych plików, żeby jeden duży plik (lockfile, fixture) nie wypchnął zmian w kodzie.
-  Pominięte pliki trafiają do modelu w osobnym bloku danych, a treść recenzji zaczyna się od informacji, których
-  plików przegląd nie objął. Prompt podaje modelowi limit tur, żeby przy jego końcu oddał przegląd tego, co
-  przeczytał, zamiast przekroczyć limit i dać pominięcie.
-- Rubryka to `CLAUDE.md` i `AGENTS.md` z commita bazowego PR-a (`git show <base>:CLAUDE.md`), więc PR nie osłabia
-  reguł, które go oceniają. Gdy commita bazowego nie ma w checkoucie, rubryka pochodzi z heada, a log mówi
-  „rubryka z head”.
-- Agent SDK: średni wysiłek, narzędzia `Read`, `Grep`, `Glob`, tryb `dontAsk`, bez ustawień z dysku
-  (`settingSources: []`, więc hooki z PR-a się nie uruchamiają), limit 20 tur, `max-budget-usd`, limit czasu
-  pierwszej próby 15 minut, a ponowienie przez bramkę AI dostaje tylko czas, który zostaje ze wspólnych 18 minut,
-  wynik jako JSON ze schematu. Tytuł, opis, rubryka i diff mają limity długości, a znaczniki danych w ich
-  treści są neutralizowane.
-- Wynik przechodzi walidację, uwagi spoza linii diffu odpadają, reszta jest cięta do `max-comments` według powagi.
-  Tekst modelu przed publikacją: wycięte sekrety, `@wzmianki` rozbrojone znakiem zerowej szerokości, obrazy markdown
-  i definicje odnośników usunięte, HTML zneutralizowany, odnośniki pokazane z adresem, długość ucięta (podsumowanie
-  3000 znaków, uwaga 4000, całość poniżej limitu GitHuba). Publikacja w trzech krokach: recenzja z uwagami w linii,
-  przy 422 recenzja z listą uwag w treści, przy kolejnym 422 samo krótkie podsumowanie.
-- Pominięcie z oczekiwanego powodu nie daje czerwonego checka: wyczerpany kredyt (402) albo limit użycia, limit
-  zapytań (429), odrzucony klucz (401, 403), niedostępne API Anthropic (5xx), błąd sieci, limit czasu, budżet, limit
-  tur, niedostępne API GitHuba i brak sekretów. Na trasie bramki AI to samo dotyczy wyczerpanego budżetu klucza
-  bramki (402), limitu zapytań bramki (429), odrzuconego klucza bramki (401, 403) i niedostępnej bramki (5xx).
-  Gdy bramka była próbowana, komentarz podaje oba powody: „<powód>; bramka AI: <powód bramki>”, a bez jej klucza
-  „<powód>; bramka AI nieskonfigurowana (brak sekretu AI_GATEWAY_API_KEY)”. Jest jedna linia w logu, komentarz
-  o pominięciu i kod 0. Niewyjaśniona odmowa API albo bramki (każdy inny 4xx, np. 400, 404, 413, 422) daje ten sam
-  komentarz, ale kod 1 i czerwony check, bo zwykle znaczy błąd w żądaniu, który trzeba naprawić. Gdy nie da się dodać nawet komentarza, zostaje druga linia w logu, a kod
-  się nie zmienia. Błąd własnego kodu albo zły JSON wyniku kończy się kodem 1, a log podaje rodzaj błędu bez treści
-  odpowiedzi modelu.
-- Log to kilka linii na przebieg: rozmiar diffu, źródło rubryki, liczba uwag, trasa, model, tury, tokeny, koszt
-  (albo „koszt nieznany”, gdy bramka nie poda kosztu), liczba odmów narzędzi. Przy pominięciu przez API linia podaje też tekst błędu API, z wyciętymi sekretami i uciętą do 300 znaków;
-  do komentarza na PR-ze on nie trafia. Klucz, prompt i odpowiedzi modelu nigdy do niego nie trafiają.
+## Manual rerun
 
-## Ograniczenia i świadome wybory
-
-- `workflow_dispatch` (ręczne ponowienie) działa dopiero, gdy plik `claude-review.yml` jest na gałęzi domyślnej
-  wołającego repo. PR, który dodaje go do innej gałęzi, dostaje przegląd przy otwarciu, ale ręcznego ponowienia nie.
-- Przed pierwszym PR-em w wołającym repo: tu Settings → Actions → General → Access → „Accessible from repositories
-  owned by the user”. Bez tego wywołanie kończy się przy starcie workflowu błędem „workflow was not found”
-  (czerwony check, bez komentarza), bo skrypt nawet nie rusza.
-- `ready_for_review` uruchamia przegląd przy każdym przejściu ze szkicu do gotowego, a `concurrency` tylko
-  szereguje przebiegi, nie usuwa powtórzeń: każde przełączenie to nowy płatny przegląd. Sufitem jest
-  `max-budget-usd` na przebieg i kredyt API.
-- Hak granicy repozytorium warto potwierdzić na żywo: pierwszy przegląd testowy pokazuje w logu „odmowy narzędzi 0”
-  na zwykłym PR-ze.
-
-## Ponowne uruchomienie ręczne
-
-Actions → „Claude review” → Run workflow → numer PR. Albo:
+Actions, then "Claude review", then Run workflow with the PR number, or:
 
 ```sh
 gh workflow run claude-review.yml --repo <owner>/<repo> -f pr-number=<n>
 ```
 
-Każde uruchomienie to nowy przegląd i nowy koszt.
+Each run is a new paid review. `workflow_dispatch` works only once the caller workflow is on the default branch.
 
-## Kredyt API
+## Releases
 
-Płaci kredyt API tej org, którą wskazuje zmienna `CLAUDE_REVIEW_ROUTE` (sekcja „Klucz API”): org `asystent`, 100 USD
-miesięcznie, albo „Kamil's Individual Org”, 200 USD miesięcznie, odnawiane 26. dnia miesiąca. Niewykorzystany kredyt
-przepada, a po wyczerpaniu żądania stają do odnowienia (twardy stop, bez karty i bez auto-reload). Przy wyczerpanym kredycie przegląd idzie bramką AI, gdy jest
-jej klucz; bez klucza zostaje komentarz „pominięty” zamiast czerwonego checka.
+Each release gets a fixed tag `v1.x.y`; tags are never moved. A breaking change to inputs, secrets or permissions
+is `v2`. A release pull request ends with three commits:
 
-## Trasa zapasowa: bramka AI
+1. Code plus `version` in `package.json` and `package-lock.json`. This commit is the action SHA.
+2. `.github/workflows/review.yml` calls `kamilszczepanik/claude-pr-reviewer@<action SHA> # v1.x.y`. This commit is
+   the release SHA.
+3. The release SHA in the quick start example, a new top row in the pin table and in
+   `.github/workflows/claude-review.yml`.
 
-Gdy trasa kredytu API odpowie wyczerpanym kredytem (402, tekst o kredycie albo rozliczeniu) albo wyczerpanym limitem
-użycia (`usage limit` przy 400 lub 429), recenzent raz ponawia cały przegląd od zera przez Vercel AI Gateway. Przy
-401, 403, zwykłym 429, 5xx, błędzie sieci, limicie czasu, budżecie i limicie tur ponowienia nie ma. Bez
-`ANTHROPIC_API_KEY`, a z kluczem bramki, przegląd idzie od razu bramką. Bramka nie ma trasy dalej.
+Merge with a merge commit only (squash and rebase change the SHAs). `npm test` checks that the code under every pin
+matches the tree.
 
-Na trasie bramki proces Agent SDK dostaje `ANTHROPIC_BASE_URL=https://ai-gateway.vercel.sh/claude-code` (bez `/v1`),
-`ANTHROPIC_AUTH_TOKEN` z kluczem bramki i pusty `ANTHROPIC_API_KEY`; trasa kredytu API tych zmiennych nie dostaje.
-Model wybiera wejście `gateway-model`, domyślnie `anthropic/claude-sonnet-5.5`. Linia stanu recenzji mówi wtedy
-„trasa: bramka AI”, a log zapisuje powód przełączenia („Trasa kredyt API: <powód>; ponawiam przez bramkę AI”).
+## Development
 
-Koszt przeglądu bramką jest taki sam jak na kredycie API, około 0,10–0,50 USD, zwykle 0,30–0,50, bo obie trasy liczą te
-same tokeny tego samego modelu po cenie katalogowej; `max-budget-usd` i limit tur obowiązują jak na kredycie API.
-Twardym limitem jest budżet klucza bramki (20 USD miesięcznie), a jego wyczerpanie (402) daje pominięcie bez czerwonego
-checka. Obrót klucza: nowy klucz w panelu AI Gateway, podmiana sekretu w każdym repozytorium
-(`gh secret set AI_GATEWAY_API_KEY --repo <owner>/<repo>`), dopiero potem wyłączenie starego.
+Node 22, plain ESM, dependencies pinned to exact versions. `npm test` runs `node --test` over the pure logic: diff
+line mapping, truncation, result validation, error classification, sanitizing, publishing fallbacks, the repository
+boundary, route selection and pin consistency. The pin tests need full git history (`git fetch --unshallow` in a
+shallow clone).
 
-Retencja: na tej trasie diff idzie przez Vercel do Anthropic bez przypięcia regionu i bez zerowej retencji, na co się
-godzimy, bo kod nie niesie danych osobowych.
+## License
 
-## Klucz API
-
-Trasę wybiera zmienna repozytorium `CLAUDE_REVIEW_ROUTE`, bez zmiany kodu i bez nadpisywania sekretu:
-
-| Wartość                  | Klucz                        | Kto płaci               |
-| ------------------------ | ---------------------------- | ----------------------- |
-| `asystent`               | `ANTHROPIC_API_KEY_ASYSTENT` | org `asystent`          |
-| `individual` albo brak   | `ANTHROPIC_API_KEY`          | Kamil's Individual Org  |
-| `gateway`                | `AI_GATEWAY_API_KEY`         | klucz Vercel AI Gateway |
-
-Wszystko naraz (zmienna w czterech repozytoriach, lokalne `.env` i pliki evali) przełącza
-`~/workspace/.secrets/use-claude-org <asystent|individual|gateway>`, a bez argumentu pokazuje aktywną trasę. Gałąź ze starym
-wołającym czyta `ANTHROPIC_API_KEY`, dopóki nie dostanie selektora. Literówka w zmiennej albo pusty sekret trasy daje pusty klucz, czyli
-bramkę, a linia stanu recenzji nazywa trasę. Klucz tworzymy wewnątrz workspace'u Default
-i sprawdzamy żądaniem na jeden token, bo prefiks klucza nie zdradza, czy ma workspace. Obrót: nowy klucz w Console, podmiana
-sekretu danej trasy w każdym repozytorium (`gh secret set <nazwa> --repo <owner>/<repo>`), ręczne ponowienie przeglądu na
-dowolnym PR-ze, dopiero potem wyłączenie starego klucza.
-
-## Tagi i wydanie
-
-`v1` stoi na `v1.4.0` (`1313a005`) i już się nie przesuwa: nikt go nie używa, a ruchomy tag wymagał force-pushu.
-Każde wydanie dostaje stały tag `v1.x.y`, wysyłany zwykłym pushem; force-pushu w tym repozytorium nie ma. Wołające
-repozytoria przypinają SHA (sekcja „Przypięcie”), więc nowe wydanie dociera do nich PR-em Dependabota albo ręczną
-zmianą SHA. Zmiana niezgodna wstecz (wejścia, sekrety, uprawnienia) to `v2`.
-
-PR, który zmienia `action.yml`, `scripts/`, `package.json` albo `package-lock.json`, jest wydaniem: `npm test`
-sprawdza, że kod pod przypięciem akcji i pod przypięciem przeglądu własnego jest taki sam jak w drzewie. Wydanie to
-trzy ostatnie commity PR-a, w tej kolejności:
-
-1. Kod i `version` w `package.json` oraz `package-lock.json` (`npm version 1.x.y --no-git-tag-version`). Ten commit
-   to SHA akcji.
-2. `.github/workflows/review.yml`: krok `Review with Claude` woła
-   `kamilszczepanik/claude-pr-reviewer@<SHA commita 1> # v1.x.y`. Ten commit to SHA wydania.
-3. SHA wydania w przykładzie „Jak wołać”, nowy wiersz na górze tabeli w „Przypięcie” i `uses:` w
-   `.github/workflows/claude-review.yml`, więc PR wydania przegląda już nowy łańcuch przypięć.
-
-Poprawka kodu po commicie 2 powtarza kroki 2 i 3. PR scalamy wyłącznie zwykłym merge'em (`gh pr merge --merge`):
-squash i rebase zmieniają SHA i osierocają przypięcia. Po scaleniu `git tag v1.x.y <SHA wydania>` i
-`git push origin v1.x.y`.
-
-## Rozwój
-
-Node 22, czysty ESM, zależności przypięte do dokładnych wersji. `npm test` uruchamia `node --test` na czystej logice:
-mapowanie linii diffu, obcinanie, walidacja wyniku, wybór komunikatu przy błędzie API, sanityzacja i limity długości,
-publikacja z cofaniem po 422, wyjście 0 przy pominięciu, granica repozytorium, rubryka z bazy, przypięcia po SHA i zgodność
-kodu pod przypięciem, wybór trasy i ponowienie przez bramkę, stronicowanie komentarzy. Testy przypięć potrzebują pełnej
-historii gita: w płytkim klonie najpierw `git fetch --unshallow` (CI pobiera ją przez `fetch-depth: 0`).
+[MIT](LICENSE)
