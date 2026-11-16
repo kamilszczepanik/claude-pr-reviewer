@@ -41,14 +41,14 @@ describe('listComments', () => {
       pages: [page({ comments: [{ id: 1 }], next: 'https://evil.example/repos/o/r/issues/7/comments?page=2' })],
       requests: 1,
       result: [{ id: 1 }],
-      logs: ['Komentarze PR: pomijam następną stronę spoza https://api.github.com'],
+      logs: ['PR comments: skipping a next page outside https://api.github.com'],
     },
     {
       label: 'reads at most ten pages',
       pages: endless,
       requests: 10,
       result: endless.slice(0, 10).flatMap(({ comments }) => comments),
-      logs: ['Komentarze PR: przeczytane tylko pierwsze 10 stron, dalszych nie czytam'],
+      logs: ['PR comments: read only the first 10 pages, not reading further'],
     },
     {
       label: 'skips when a later page answers 502',
@@ -57,7 +57,7 @@ describe('listComments', () => {
         page({ comments: {}, status: 502 }),
       ],
       requests: 2,
-      error: { skipReason: 'API GitHuba niedostępne (502)' },
+      error: { skipReason: 'GitHub API unavailable (502)' },
       logs: [],
     },
   ];

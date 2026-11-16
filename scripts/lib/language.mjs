@@ -1,4 +1,4 @@
-const POLISH_LETTERS = /[ąćęłńóśźż]/giu;
+const POLISH_LETTERS = /[\u0105\u0107\u0119\u0142\u0144\u00f3\u015b\u017a\u017c]/giu;
 const LETTERS = /\p{L}/gu;
 const POLISH_SHARE = 0.01;
 

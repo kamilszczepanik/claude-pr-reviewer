@@ -2,7 +2,7 @@ import { skipError } from './failure.mjs';
 
 const API_URL = process.env.GITHUB_API_URL ?? 'https://api.github.com';
 const REQUEST_TIMEOUT_MS = 30_000;
-const GITHUB_UNAVAILABLE = 'API GitHuba niedostępne';
+const GITHUB_UNAVAILABLE = 'GitHub API unavailable';
 
 const send = async ({ url, init }) => {
   try {
@@ -51,7 +51,7 @@ const nextPageUrl = ({ linkHeader, log }) => {
     .find(Boolean);
   if (!next) return null;
   if (next[1].startsWith(`${API_URL}/`)) return next[1];
-  log(`Komentarze PR: pomijam następną stronę spoza ${API_URL}`);
+  log(`PR comments: skipping a next page outside ${API_URL}`);
   return null;
 };
 
@@ -63,7 +63,7 @@ const listAllPages = async ({ token, path, log }) => {
     comments.push(...(await response.json()));
     url = nextPageUrl({ linkHeader: response.headers.get('link'), log });
   }
-  if (url) log(`Komentarze PR: przeczytane tylko pierwsze ${MAX_COMMENT_PAGES} stron, dalszych nie czytam`);
+  if (url) log(`PR comments: read only the first ${MAX_COMMENT_PAGES} pages, not reading further`);
   return comments;
 };
 

@@ -33,7 +33,7 @@ const agentEnv = () =>
     PASSED_ENV.filter((name) => process.env[name] !== undefined).map((name) => [name, process.env[name]]),
   );
 
-const timeoutError = (timeoutMs) => skipError(`przekroczony czas ${Math.ceil(timeoutMs / 60_000)} min`);
+const timeoutError = (timeoutMs) => skipError(`timed out after ${Math.ceil(timeoutMs / 60_000)} min`);
 
 const collectResult = async ({
   model,
@@ -82,7 +82,7 @@ const collectResult = async ({
     clearTimeout(timer);
   }
   if (!result && abortController.signal.aborted) throw timeoutError(timeoutMs);
-  if (!result) throw new Error('Agent SDK nie zwrócił wyniku');
+  if (!result) throw new Error('Agent SDK returned no result');
   return result;
 };
 

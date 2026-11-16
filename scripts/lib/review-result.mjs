@@ -19,7 +19,7 @@ export const REVIEW_JSON_SCHEMA = z.toJSONSchema(reviewSchema, {
 });
 
 const invalidOutput = (reason) =>
-  Object.assign(new Error(`Wynik modelu odrzucony: ${reason}`), {
+  Object.assign(new Error(`Model output rejected: ${reason}`), {
     name: 'InvalidReviewOutput',
   });
 
@@ -27,14 +27,14 @@ const parseJson = (value) => {
   try {
     return JSON.parse(value);
   } catch {
-    throw invalidOutput('to nie JSON');
+    throw invalidOutput('not JSON');
   }
 };
 
 export const parseReview = (value) => {
   const parsed = reviewSchema.safeParse(typeof value === 'string' ? parseJson(value) : value);
   if (!parsed.success) {
-    throw invalidOutput(`niezgodny ze schematem (${parsed.error.issues.length} błędów)`);
+    throw invalidOutput(`does not match the schema (${parsed.error.issues.length} errors)`);
   }
   return parsed.data;
 };

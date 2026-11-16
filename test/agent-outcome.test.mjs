@@ -18,7 +18,7 @@ describe('reviewOutcome', () => {
     {
       label: 'the turn limit',
       input: { result: { subtype: 'error_max_turns', is_error: true, errors: [] }, maxBudgetUsd: 2, guardDenials: 0 },
-      outcome: { thrown: skipped('wyczerpany limit 20 tur') },
+      outcome: { thrown: skipped('turn limit of 20 exhausted') },
     },
     {
       label: 'the budget',
@@ -27,7 +27,7 @@ describe('reviewOutcome', () => {
         maxBudgetUsd: 2,
         guardDenials: 0,
       },
-      outcome: { thrown: skipped('przekroczony budżet 2 USD') },
+      outcome: { thrown: skipped('budget of 2 USD exceeded') },
     },
     {
       label: 'an unexplained API rejection',
@@ -76,7 +76,7 @@ describe('reviewOutcome', () => {
       },
       outcome: {
         thrown: {
-          message: 'Przegląd przerwany: error_during_execution; odpowiedź API: boom [redacted] again',
+          message: 'Review interrupted: error_during_execution; API response: boom [redacted] again',
           skipReason: undefined,
           failsCheck: undefined,
           skipDetail: undefined,
@@ -92,7 +92,7 @@ describe('reviewOutcome', () => {
       },
       outcome: {
         thrown: {
-          message: 'Przegląd przerwany: success; odpowiedź API: Invalid API key · Fix it',
+          message: 'Review interrupted: success; API response: Invalid API key · Fix it',
           skipReason: undefined,
           failsCheck: undefined,
           skipDetail: undefined,
