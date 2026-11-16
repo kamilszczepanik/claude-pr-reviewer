@@ -111,8 +111,10 @@ With neither, the review is skipped with a comment and no red check.
 
 The review is written in English unless the repository rubric (`CLAUDE.md` and `AGENTS.md` on the base branch) is
 mostly Polish; then the summary, the comments and the fixed texts (status line, severity labels, the "review skipped"
-comment) are Polish. The language is decided in code from the share of Polish letters in the rubric, not by the
-model. Skip reasons and Actions logs are always English.
+comment) are Polish. The language is decided in code from the share of Polish letters in the rubric prose, with code
+blocks and inline code left out, not by the model. A rubric read from the pull request head (no base commit in the
+checkout) never switches the language. A skip that happens before the rubric can be read (GitHub unreachable while
+fetching the pull request) is posted in English. Skip reasons and Actions logs are always English.
 
 ## Fallback route: Vercel AI Gateway
 

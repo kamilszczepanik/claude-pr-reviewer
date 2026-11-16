@@ -55,6 +55,19 @@ The exception, because they are addresses: route directories under \`src/app\`
 (\`koszyk\`, \`dostawa\`, \`sposob-platnosci\`). A constant's name is English, its value
 is not.`;
 
+const POLISH_CODE = `Copy lives in one constant:
+
+\`\`\`ts
+export const KOSZYK = { pusty: 'Twój koszyk jest pusty', dodaj: 'Dodaj do koszyka', usuń: 'Usuń z koszyka' };
+export const BŁĘDY = { sieć: 'Błąd połączenia, spróbuj ponownie później', płatność: 'Płatność odrzucona' };
+\`\`\`
+
+Labels such as \`Zamówienie złożone\`, \`Przejdź do płatności\` and \`Wróć do sklepu\` are tested verbatim.
+
+~~~
+Dziękujemy za zamówienie! Wyślemy potwierdzenie na Twój adres e-mail, gdy paczka opuści magazyn.
+~~~`;
+
 describe('detectReviewLanguage', () => {
   const cases = [
     { label: 'the asystent rubric', text: ASYSTENT, language: 'pl' },
@@ -62,10 +75,13 @@ describe('detectReviewLanguage', () => {
     { label: 'the dg-cars rubric quoting Polish copy', text: DG_CARS, language: 'en' },
     { label: 'an empty rubric', text: '', language: 'en' },
     { label: 'whitespace and markdown only', text: '## \n\n- `` \n---\n|  |  |\n', language: 'en' },
+    { label: 'English prose around Polish code', text: `${PLATERO}\n\n${POLISH_CODE}`, language: 'en' },
+    { label: 'Polish prose around English code', text: `${ASYSTENT}\n\n\`\`\`sh\n${PLATERO}\n${PLATERO}\n\`\`\``, language: 'pl' },
+    { label: 'a Polish rubric from the head branch', text: ASYSTENT, source: 'head', language: 'en' },
   ];
-  for (const { label, text, language } of cases) {
+  for (const { label, text, source = 'base', language } of cases) {
     it(`reads ${label} as ${language}`, () => {
-      assert.equal(detectReviewLanguage(text), language);
+      assert.equal(detectReviewLanguage({ text, source }), language);
     });
   }
 });

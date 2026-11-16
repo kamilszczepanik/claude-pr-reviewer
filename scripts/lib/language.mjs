@@ -1,10 +1,16 @@
-const POLISH_LETTERS = /[\u0105\u0107\u0119\u0142\u0144\u00f3\u015b\u017a\u017c]/giu;
+const POLISH_LETTERS = /[ąćęłńóśźż]/giu;
 const LETTERS = /\p{L}/gu;
+const FENCED_CODE = /^[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:^[ \t]*\1[`~]*[ \t]*$|(?![\s\S]))/gm;
+const INLINE_CODE = /(`+)[\s\S]*?\1/g;
 const POLISH_SHARE = 0.01;
 
-export const detectReviewLanguage = (rubricText) => {
-  const letters = rubricText.match(LETTERS)?.length ?? 0;
+const proseOf = (text) => text.replace(FENCED_CODE, '').replace(INLINE_CODE, '');
+
+export const detectReviewLanguage = ({ text, source }) => {
+  if (source !== 'base') return 'en';
+  const prose = proseOf(text);
+  const letters = prose.match(LETTERS)?.length ?? 0;
   if (letters === 0) return 'en';
-  const polish = rubricText.match(POLISH_LETTERS)?.length ?? 0;
+  const polish = prose.match(POLISH_LETTERS)?.length ?? 0;
   return polish / letters >= POLISH_SHARE ? 'pl' : 'en';
 };

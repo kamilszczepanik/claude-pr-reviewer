@@ -112,15 +112,17 @@ const reviewWithRubric = async ({
 };
 
 const reviewPullRequest = async ({ config, github, secrets }) => {
-  const route = firstRoute(config);
   const pullRequest = await github.pullRequest();
-  const headSha = config.headSha ?? pullRequest.head.sha;
-  const fullDiff = await fetchDiff({ github, baseSha: pullRequest.base.sha, headSha });
   const rubric = await readRubric({ repoDir: config.repoDir, baseSha: pullRequest.base.sha });
-  const language = detectReviewLanguage(rubric.text);
+  const language = detectReviewLanguage(rubric);
   return withLanguage({
     language,
-    run: () => reviewWithRubric({ config, github, secrets, route, pullRequest, headSha, fullDiff, rubric, language }),
+    run: async () => {
+      const route = firstRoute(config);
+      const headSha = config.headSha ?? pullRequest.head.sha;
+      const fullDiff = await fetchDiff({ github, baseSha: pullRequest.base.sha, headSha });
+      return reviewWithRubric({ config, github, secrets, route, pullRequest, headSha, fullDiff, rubric, language });
+    },
   });
 };
 
