@@ -3,7 +3,8 @@ import { readConfig } from './lib/config.mjs';
 import { rightLinesByPath, truncateDiff } from './lib/diff.mjs';
 import { skipError } from './lib/failure.mjs';
 import { createGithub } from './lib/github.mjs';
-import { buildPrompt, readRubric, SYSTEM_PROMPT } from './lib/prompt.mjs';
+import { detectReviewLanguage } from './lib/language.mjs';
+import { buildPrompt, readRubric, systemPromptFor } from './lib/prompt.mjs';
 import { publishReview, runReviewProcess, settleReview } from './lib/publish.mjs';
 import { buildReviewBody, buildShortBody, cleanReview, toInlineComment } from './lib/review-body.mjs';
 import { selectComments } from './lib/review-result.mjs';
@@ -49,6 +50,7 @@ const reviewPullRequest = async ({ config, github, secrets }) => {
   const fullDiff = await fetchDiff({ github, baseSha: pullRequest.base.sha, headSha });
   const { diff, omittedFiles } = truncateDiff({ diff: fullDiff, maxBytes: config.maxDiffBytes });
   const rubric = await readRubric({ repoDir: config.repoDir, baseSha: pullRequest.base.sha });
+  const language = detectReviewLanguage(rubric.text);
   log(
     `Przegląd PR #${config.prNumber}: diff ${Buffer.byteLength(diff)} B, pominięte pliki ${omittedFiles.length}, rubryka z ${rubric.source}`,
   );
@@ -73,7 +75,7 @@ const reviewPullRequest = async ({ config, github, secrets }) => {
         maxBudgetUsd: config.maxBudgetUsd,
         secrets,
         cwd: config.repoDir,
-        systemPrompt: SYSTEM_PROMPT,
+        systemPrompt: systemPromptFor(language),
         prompt,
       }),
   });

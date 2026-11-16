@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 
-import { SYSTEM_PROMPT, buildPrompt, readRubric } from '../scripts/lib/prompt.mjs';
+import { buildPrompt, readRubric, systemPromptFor } from '../scripts/lib/prompt.mjs';
 
 const git = (repoDir, ...args) =>
   execFileSync('git', ['-C', repoDir, '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {
@@ -29,10 +29,26 @@ describe('buildPrompt', () => {
   });
 });
 
-describe('SYSTEM_PROMPT', () => {
-  it('asks a review without findings to say what it checked', () => {
-    assert.match(SYSTEM_PROMPT, /starts with "Bez uwag\."/);
-    assert.match(SYSTEM_PROMPT, /what you checked and which concrete risks you ruled out/);
+const lastLine = (text) => text.split('\n').at(-1);
+const allButLastLine = (text) => text.split('\n').slice(0, -1);
+
+describe('systemPromptFor en', () => {
+  it('asks for English and a review without findings that says what it checked', () => {
+    const prompt = systemPromptFor('en');
+    assert.match(lastLine(prompt), /in English\./);
+    assert.match(lastLine(prompt), /starts with "No issues\."/);
+    assert.match(prompt, /what you checked and which concrete risks you ruled out/);
+    assert.deepEqual(allButLastLine(prompt), allButLastLine(systemPromptFor('pl')));
+  });
+});
+
+describe('systemPromptFor pl', () => {
+  it('asks for Polish and a review without findings that says what it checked', () => {
+    const prompt = systemPromptFor('pl');
+    assert.match(lastLine(prompt), /in Polish\./);
+    assert.match(lastLine(prompt), /starts with "Bez uwag\."/);
+    assert.match(prompt, /what you checked and which concrete risks you ruled out/);
+    assert.notEqual(lastLine(prompt), lastLine(systemPromptFor('en')));
   });
 });
 
