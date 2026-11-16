@@ -4,11 +4,12 @@ import { rightLinesByPath, truncateDiff } from './lib/diff.mjs';
 import { skipError } from './lib/failure.mjs';
 import { createGithub } from './lib/github.mjs';
 import { detectReviewLanguage } from './lib/language.mjs';
+import { MESSAGES } from './lib/messages.mjs';
 import { buildPrompt, readRubric, systemPromptFor } from './lib/prompt.mjs';
 import { publishReview, runReviewProcess, settleReview } from './lib/publish.mjs';
 import { buildReviewBody, buildShortBody, cleanReview, toInlineComment } from './lib/review-body.mjs';
 import { selectComments } from './lib/review-result.mjs';
-import { firstRoute, ROUTE_LABELS, runRoutedReview } from './lib/routes.mjs';
+import { firstRoute, runRoutedReview } from './lib/routes.mjs';
 
 const DIFF_TOO_LARGE = 406;
 
@@ -27,7 +28,7 @@ const fetchDiff = async ({ github, baseSha, headSha }) => {
 };
 
 const reviewAttempts = ({ headSha, review, bodyInput }) => {
-  const inline = review.comments.map(toInlineComment);
+  const inline = review.comments.map((comment) => toInlineComment({ ...comment, language: bodyInput.language }));
   return [
     { commitId: headSha, body: buildReviewBody(bodyInput), comments: inline },
     ...(inline.length > 0
@@ -88,6 +89,7 @@ const reviewPullRequest = async ({ config, github, secrets }) => {
   const clean = cleanReview({
     review: { summary: review.summary, comments },
     secrets,
+    language,
   });
   const bodyInput = {
     summary: clean.summary,
@@ -97,10 +99,11 @@ const reviewPullRequest = async ({ config, github, secrets }) => {
     tokens,
     omittedFiles,
     droppedOverCap,
+    language,
   };
   const used = await publishReview({ github, attempts: reviewAttempts({ headSha, review: clean, bodyInput }) });
   log(
-    `Wynik: ${comments.length} uwag, wariant publikacji ${used}, poza diffem ${droppedOutsideDiff}, trasa ${ROUTE_LABELS[outcome.route]}, model ${model}, tury ${turns}, tokeny ${tokens.input}/${tokens.output}, ${costLine({ route: outcome.route, costUsd })}, odmowy narzędzi ${denials}`,
+    `Wynik: ${comments.length} uwag, wariant publikacji ${used}, poza diffem ${droppedOutsideDiff}, trasa ${MESSAGES.en.routes[outcome.route]}, model ${model}, tury ${turns}, tokeny ${tokens.input}/${tokens.output}, ${costLine({ route: outcome.route, costUsd })}, odmowy narzędzi ${denials}`,
   );
 };
 

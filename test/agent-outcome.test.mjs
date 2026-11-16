@@ -43,8 +43,8 @@ describe('reviewOutcome', () => {
       },
       outcome: {
         thrown: {
-          message: 'API Anthropic odrzuciło żądanie (400)',
-          skipReason: 'API Anthropic odrzuciło żądanie (400)',
+          message: 'Anthropic API rejected the request (400)',
+          skipReason: 'Anthropic API rejected the request (400)',
           failsCheck: true,
           skipDetail: 'API Error: 400 prompt is too long',
         },
@@ -60,8 +60,8 @@ describe('reviewOutcome', () => {
       },
       outcome: {
         thrown: {
-          message: 'wyczerpany budżet klucza bramki AI',
-          skipReason: 'wyczerpany budżet klucza bramki AI',
+          message: 'AI gateway key budget exhausted',
+          skipReason: 'AI gateway key budget exhausted',
           failsCheck: false,
           skipDetail: 'quota_for_entity_exceeded',
         },
@@ -76,7 +76,7 @@ describe('reviewOutcome', () => {
       },
       outcome: {
         thrown: {
-          message: 'Przegląd przerwany: error_during_execution; odpowiedź API: boom [ukryte] again',
+          message: 'Przegląd przerwany: error_during_execution; odpowiedź API: boom [redacted] again',
           skipReason: undefined,
           failsCheck: undefined,
           skipDetail: undefined,

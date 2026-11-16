@@ -3,7 +3,13 @@ import { describe, it } from 'node:test';
 
 import { apiSkipError, skipError } from '../scripts/lib/failure.mjs';
 import { failureLine, publishReview, runReviewProcess, settleReview, SKIP_MARKER } from '../scripts/lib/publish.mjs';
-import { buildReviewBody, buildShortBody, cleanReview, GITHUB_BODY_LIMIT } from '../scripts/lib/review-body.mjs';
+import {
+  buildReviewBody,
+  buildShortBody,
+  cleanReview,
+  GITHUB_BODY_LIMIT,
+  toInlineComment,
+} from '../scripts/lib/review-body.mjs';
 
 const httpError = (status) => Object.assign(new Error(`GitHub ${status}`), { status });
 
@@ -107,7 +113,7 @@ describe('settleReview', () => {
     assert.equal(github.calls.posted.length, 1);
     const [comment] = github.calls.posted;
     assert.ok(comment.startsWith(SKIP_MARKER));
-    assert.ok(comment.includes('odrzuciło żądanie (400)'));
+    assert.ok(comment.includes('rejected the request (400)'));
     assert.ok(!comment.includes('prompt is too long'));
     assert.equal(lines.length, 1);
     assert.ok(lines[0].includes('odpowiedź API: prompt is too long'));
@@ -129,7 +135,7 @@ describe('settleReview', () => {
     assert.equal(lines.length, 1);
     assert.ok(!lines[0].includes(secret));
     assert.ok(!lines[0].includes('sk-ant-api03-abcdefghijklmnop'));
-    assert.ok(lines[0].includes('[ukryte]'));
+    assert.ok(lines[0].includes('[redacted]'));
     assert.ok(lines[0].length <= 300);
     assert.equal(github.calls.posted.length, 0);
     const gatewayKey = 'vck_gateway-key-0987654321';
@@ -141,7 +147,7 @@ describe('settleReview', () => {
     assert.equal(topLines.length, 1);
     assert.ok(!topLines[0].includes(gatewayKey));
     assert.ok(!topLines[0].includes(Buffer.from(gatewayKey).toString('base64')));
-    assert.ok(topLines[0].includes('[ukryte]'));
+    assert.ok(topLines[0].includes('[redacted]'));
     assert.throws(() => failureLine({ error: new Error(secret) }), TypeError);
     const unprintable = {
       toString: () => {
@@ -172,8 +178,8 @@ describe('review body', () => {
       },
       secrets: [],
     });
-    assert.equal(review.summary, '@​kamil klucz [ukryte]');
-    assert.equal(review.comments[0].body, '(obraz usunięty)');
+    assert.equal(review.summary, '@​kamil klucz [redacted]');
+    assert.equal(review.comments[0].body, '(image removed)');
   });
 
   it('stays under the GitHub body limit with the longest fallback list', () => {
@@ -201,7 +207,7 @@ describe('review body', () => {
       fallbackComments: review.comments,
     });
     assert.ok(body.length <= GITHUB_BODY_LIMIT);
-    assert.match(body, /<sub>Przegląd Claude · trasa: kredyt API · model claude-opus-5-5/);
+    assert.match(body, /<sub>Claude review · route: API credit · model claude-opus-5-5/);
   });
 
   it('names the gateway route in the status line of the full and the short body', () => {
@@ -215,9 +221,46 @@ describe('review body', () => {
       droppedOverCap: 0,
     };
     for (const body of [buildReviewBody(input), buildShortBody(input)]) {
-      assert.ok(body.split('\n').at(-1).includes('trasa: bramka AI · model anthropic/claude-sonnet-5.5'));
+      assert.ok(body.split('\n').at(-1).includes('route: AI gateway · model anthropic/claude-sonnet-5.5'));
     }
   });
+
+  const fixedTexts = {
+    en: {
+      heading: '**Severity: medium**\n\nb',
+      truncation:
+        '**Diff truncated:** Claude did not see the changes in 1 files and this review does not cover them: "a.ts".',
+      shortTruncation:
+        '**Diff truncated:** Claude did not see the changes in 1 files and this review does not cover them.',
+      dropped: 'Comments dropped over the limit: 3.',
+      footer: '<sub>Claude review · route: API credit · model m · turns 2 · input tokens 4, output 5</sub>',
+    },
+    pl: {
+      heading: '**Powaga: średnia**\n\nb',
+      truncation: '**Diff obcięty:** Claude nie widział zmian w 1 plikach i ten przegląd ich nie obejmuje: "a.ts".',
+      shortTruncation: '**Diff obcięty:** Claude nie widział zmian w 1 plikach i ten przegląd ich nie obejmuje.',
+      dropped: 'Pominięte uwagi ponad limit: 3.',
+      footer: '<sub>Przegląd Claude · trasa: kredyt API · model m · tury 2 · tokeny wejścia 4, wyjścia 5</sub>',
+    },
+  };
+  for (const [language, texts] of Object.entries(fixedTexts)) {
+    it(`writes the severity heading, truncation note, dropped count and footer in ${language}`, () => {
+      const input = {
+        summary: 'S',
+        route: 'api',
+        model: 'm',
+        turns: 2,
+        tokens: { input: 4, output: 5 },
+        omittedFiles: ['a.ts'],
+        droppedOverCap: 3,
+        language,
+      };
+      const inline = toInlineComment({ path: 'a', line: 1, severity: 'medium', body: 'b', language });
+      assert.equal(inline.body, texts.heading);
+      assert.equal(buildReviewBody(input), [texts.truncation, 'S', texts.dropped, texts.footer].join('\n\n'));
+      assert.equal(buildShortBody(input), [texts.shortTruncation, 'S', texts.footer].join('\n\n'));
+    });
+  }
 
   it('escapes model paths in the fallback list like omitted files', () => {
     const fallbackBody = (comment) =>
@@ -233,7 +276,7 @@ describe('review body', () => {
       });
     const body = fallbackBody({ path: 'src/`a`<img src=x>@kamil.ts', body: 'b' });
     assert.ok(body.includes('"src/'));
-    assert.ok(body.includes(':3 (wysoka): b'));
+    assert.ok(body.includes(':3 (high): b'));
     assert.ok(!body.includes('<img'));
     assert.ok(body.includes('@\u200Bkamil'));
     assert.ok(!body.includes('`src/'));

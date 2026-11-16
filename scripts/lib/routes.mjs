@@ -1,6 +1,5 @@
 import { skipError } from './failure.mjs';
 
-export const ROUTE_LABELS = { api: 'kredyt API', gateway: 'bramka AI' };
 export const GATEWAY_BASE_URL = 'https://ai-gateway.vercel.sh/claude-code';
 
 const MINUTE_MS = 60_000;
@@ -10,7 +9,7 @@ const REVIEW_DEADLINE_MS = 18 * MINUTE_MS;
 export const firstRoute = ({ apiKey, gatewayKey }) => {
   if (apiKey) return 'api';
   if (gatewayKey) return 'gateway';
-  throw skipError('brak sekretu ANTHROPIC_API_KEY ani AI_GATEWAY_API_KEY');
+  throw skipError('no ANTHROPIC_API_KEY or AI_GATEWAY_API_KEY secret');
 };
 
 export const routeEnv = ({ route, baseEnv, gatewayKey }) => {
@@ -27,7 +26,9 @@ const attemptOn = async ({ route, config, attempt, timeoutMs }) => {
   return { ...(await attempt({ route, model, timeoutMs })), route, model };
 };
 
-const gatewayJoinReason = (reason) => `${ROUTE_LABELS.gateway}: ${reason.replace(`${ROUTE_LABELS.gateway} `, '')}`;
+const GATEWAY_NAME = 'AI gateway';
+
+const gatewayJoinReason = (reason) => `${GATEWAY_NAME}: ${reason.replace(`${GATEWAY_NAME} `, '')}`;
 
 const joinedSkip = ({ reason, cause }) =>
   Object.assign(skipError(reason), { failsCheck: cause.failsCheck, skipDetail: cause.skipDetail });
@@ -40,11 +41,11 @@ export const runRoutedReview = async ({ route, config, attempt, log, now = Date.
     if (route !== 'api' || !error.skipReason || error.fallback !== true) throw error;
     if (!config.gatewayKey) {
       throw joinedSkip({
-        reason: `${error.skipReason}; bramka AI nieskonfigurowana (brak sekretu AI_GATEWAY_API_KEY)`,
+        reason: `${error.skipReason}; ${GATEWAY_NAME} not configured (no AI_GATEWAY_API_KEY secret)`,
         cause: error,
       });
     }
-    log(`Trasa ${ROUTE_LABELS.api}: ${error.skipReason}; ponawiam przez bramkę AI`);
+    log(`Route API credit: ${error.skipReason}; retrying through the ${GATEWAY_NAME}`);
     try {
       const timeoutMs = Math.min(ATTEMPT_TIMEOUT_MS, Math.max(0, deadline - now()));
       return await attemptOn({ route: 'gateway', config, attempt, timeoutMs });
