@@ -24,8 +24,8 @@ const readEvent = async (eventPath) => (eventPath ? JSON.parse(await readFile(ev
 export const readConfig = async (env) => {
   const event = await readEvent(env.GITHUB_EVENT_PATH);
   const prNumber = event.pull_request?.number ?? positiveInt(env.PR_NUMBER, null);
-  if (!prNumber) throw new Error('Brak numeru PR: ani zdarzenie pull_request, ani wejście pr-number');
-  if (!env.GITHUB_REPOSITORY || !env.GH_TOKEN) throw new Error('Brak GITHUB_REPOSITORY albo GH_TOKEN');
+  if (!prNumber) throw new Error('No PR number: neither a pull_request event nor a pr-number input');
+  if (!env.GITHUB_REPOSITORY || !env.GH_TOKEN) throw new Error('Missing GITHUB_REPOSITORY or GH_TOKEN');
   return {
     repo: env.GITHUB_REPOSITORY,
     prNumber,

@@ -1,5 +1,6 @@
 import { MAX_LOG_CHARS } from './config.mjs';
 import { apiErrorDetail } from './failure.mjs';
+import { MESSAGES } from './messages.mjs';
 
 const UNPROCESSABLE = 422;
 const HIDDEN_MESSAGE_ERRORS = new Set(['SyntaxError', 'ZodError']);
@@ -15,24 +16,24 @@ export const publishReview = async ({ github, attempts }) => {
       if (error.status !== UNPROCESSABLE || index === attempts.length - 1) throw error;
     }
   }
-  throw new Error('Brak wariantu przeglądu do wysłania');
+  throw new Error('No review variant left to post');
 };
 
 const isOwnSkipComment = (comment) => comment.user?.type === 'Bot' && comment.body?.startsWith(SKIP_MARKER);
 
 const skipLine = ({ reason, detail }) =>
-  `Przegląd Claude pominięty: ${reason}${detail ? `; odpowiedź API: ${detail}` : ''}`.slice(0, MAX_LOG_CHARS);
+  `Claude review skipped: ${reason}${detail ? `; API response: ${detail}` : ''}`.slice(0, MAX_LOG_CHARS);
 
-const reportSkip = async ({ github, reason, detail, failsCheck, log }) => {
+const reportSkip = async ({ github, reason, detail, failsCheck, language, log }) => {
   log(skipLine({ reason, detail }));
-  const body = `${SKIP_MARKER}\nPrzegląd Claude pominięty: ${reason}.\n\nTen przebieg nie sprawdził PR-a i nie zostawił żadnych uwag, więc nie traktuj go jako przeglądu bez uwag. Uruchom przegląd ponownie albo sprawdź zmiany ręcznie.`;
+  const body = `${SKIP_MARKER}\n${MESSAGES[language ?? 'en'].skipComment(reason)}`;
   try {
     const existing = (await github.listComments()).find(isOwnSkipComment);
     if (existing) await github.updateComment({ id: existing.id, body });
     else await github.postComment(body);
   } catch (error) {
     log(
-      `Komentarz o pominięciu nie powstał (${error.status ?? error.name}), ${failsCheck ? 'kończę kodem 1' : 'kończę bez błędu'}`,
+      `Skip comment not created (${error.status ?? error.name}), ${failsCheck ? 'exiting with code 1' : 'exiting without an error'}`,
     );
   }
 };
@@ -41,7 +42,7 @@ const SECRET_ENV_NAMES = ['ANTHROPIC_API_KEY', 'AI_GATEWAY_API_KEY', 'GH_TOKEN']
 
 const envSecrets = (env) => SECRET_ENV_NAMES.map((name) => env[name]).filter(Boolean);
 
-const UNREADABLE_THROWN = '<nieczytelna wartość>';
+const UNREADABLE_THROWN = '<unreadable value>';
 
 const thrownText = (thrown) => {
   try {
@@ -56,9 +57,18 @@ const asError = (thrown) => (thrown instanceof Error ? thrown : new Error(thrown
 export const failureLine = ({ error: thrown, secrets }) => {
   const error = asError(thrown);
   const detail = HIDDEN_MESSAGE_ERRORS.has(error.name)
-    ? 'treść ukryta'
+    ? 'content hidden'
     : apiErrorDetail({ text: String(error.message), secrets });
-  return `Przegląd Claude nie powiódł się: ${error.name}: ${detail}`.slice(0, MAX_LOG_CHARS);
+  return `Claude review failed: ${error.name}: ${detail}`.slice(0, MAX_LOG_CHARS);
+};
+
+export const withLanguage = async ({ language, run }) => {
+  try {
+    return await run();
+  } catch (error) {
+    if (error !== null && typeof error === 'object' && error.language === undefined) error.language = language;
+    throw error;
+  }
 };
 
 export const settleReview = async ({ run, github, log, secrets = [] }) => {
@@ -70,7 +80,14 @@ export const settleReview = async ({ run, github, log, secrets = [] }) => {
       log(failureLine({ error, secrets }));
       return 1;
     }
-    await reportSkip({ github, reason: error.skipReason, detail: error.skipDetail, failsCheck: error.failsCheck, log });
+    await reportSkip({
+      github,
+      reason: error.skipReason,
+      detail: error.skipDetail,
+      failsCheck: error.failsCheck,
+      language: error.language,
+      log,
+    });
     return error.failsCheck ? 1 : 0;
   }
 };

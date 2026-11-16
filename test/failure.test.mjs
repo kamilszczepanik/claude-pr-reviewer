@@ -6,7 +6,7 @@ import { apiSkipError } from '../scripts/lib/failure.mjs';
 const REPO_SECRET = 'tajny-klucz-repo-123';
 
 describe('apiSkipError', () => {
-  const rejected = (status) => `API Anthropic odrzuciło żądanie (${status})`;
+  const rejected = (status) => `Anthropic API rejected the request (${status})`;
   const longMessage = 'bad\nrequest sk-ant-api03-abcdefghijkl ' + 'x'.repeat(400);
   const cases = [
     {
@@ -19,7 +19,7 @@ describe('apiSkipError', () => {
     {
       failure: { status: 400, message: 'Your credit balance is too low' },
       skip: {
-        skipReason: 'wyczerpany kredyt API Anthropic',
+        skipReason: 'Anthropic API credit exhausted',
         failsCheck: false,
         fallback: true,
         skipDetail: 'Your credit balance is too low',
@@ -27,31 +27,31 @@ describe('apiSkipError', () => {
     },
     {
       failure: { status: 402 },
-      skip: { skipReason: 'wyczerpany kredyt API Anthropic', failsCheck: false, fallback: true, skipDetail: '' },
+      skip: { skipReason: 'Anthropic API credit exhausted', failsCheck: false, fallback: true, skipDetail: '' },
     },
     {
       failure: { status: 429 },
-      skip: { skipReason: 'limit zapytań albo wydatków workspace', failsCheck: false, fallback: false, skipDetail: '' },
+      skip: { skipReason: 'workspace rate or spend limit reached', failsCheck: false, fallback: false, skipDetail: '' },
     },
     {
       failure: { status: 401 },
-      skip: { skipReason: 'klucz API odrzucony (401)', failsCheck: false, fallback: false, skipDetail: '' },
+      skip: { skipReason: 'API key rejected (401)', failsCheck: false, fallback: false, skipDetail: '' },
     },
     {
       failure: { status: 529 },
-      skip: { skipReason: 'API Anthropic niedostępne (529)', failsCheck: false, fallback: false, skipDetail: '' },
+      skip: { skipReason: 'Anthropic API unavailable (529)', failsCheck: false, fallback: false, skipDetail: '' },
     },
     {
       failure: { message: 'fetch failed: ETIMEDOUT' },
-      skip: { skipReason: 'błąd sieci', failsCheck: false, fallback: false, skipDetail: 'fetch failed: ETIMEDOUT' },
+      skip: { skipReason: 'network error', failsCheck: false, fallback: false, skipDetail: 'fetch failed: ETIMEDOUT' },
     },
     {
       failure: { message: 'API Error: Connection error.' },
-      skip: { skipReason: 'błąd sieci', failsCheck: false, fallback: false, skipDetail: 'API Error: Connection error.' },
+      skip: { skipReason: 'network error', failsCheck: false, fallback: false, skipDetail: 'API Error: Connection error.' },
     },
     {
       failure: { status: 400, message: `bad key ${REPO_SECRET} here` },
-      skip: { skipReason: rejected(400), failsCheck: true, fallback: false, skipDetail: 'bad key [ukryte] here' },
+      skip: { skipReason: rejected(400), failsCheck: true, fallback: false, skipDetail: 'bad key [redacted] here' },
     },
     { failure: { message: 'Unexpected token in JSON' }, skip: null },
     { failure: { status: null, message: '' }, skip: null },
@@ -61,13 +61,13 @@ describe('apiSkipError', () => {
         skipReason: rejected(400),
         failsCheck: true,
         fallback: false,
-        skipDetail: `bad request [ukryte] ${'x'.repeat(400)}`.slice(0, 300),
+        skipDetail: `bad request [redacted] ${'x'.repeat(400)}`.slice(0, 300),
       },
     },
     {
       failure: { status: 400, message: 'You have reached your specified API usage limits. You will regain access on 2026-12-01' },
       skip: {
-        skipReason: 'wyczerpany limit użycia API Anthropic',
+        skipReason: 'Anthropic API usage limit exhausted',
         failsCheck: false,
         fallback: true,
         skipDetail: 'You have reached your specified API usage limits. You will regain access on 2026-12-01',
@@ -76,7 +76,7 @@ describe('apiSkipError', () => {
     {
       failure: { status: 429, message: 'usage limit reached' },
       skip: {
-        skipReason: 'wyczerpany limit użycia API Anthropic',
+        skipReason: 'Anthropic API usage limit exhausted',
         failsCheck: false,
         fallback: true,
         skipDetail: 'usage limit reached',
@@ -85,7 +85,7 @@ describe('apiSkipError', () => {
     {
       failure: { route: 'gateway', status: 402, message: 'quota_for_entity_exceeded' },
       skip: {
-        skipReason: 'wyczerpany budżet klucza bramki AI',
+        skipReason: 'AI gateway key budget exhausted',
         failsCheck: false,
         fallback: false,
         skipDetail: 'quota_for_entity_exceeded',
@@ -93,15 +93,15 @@ describe('apiSkipError', () => {
     },
     {
       failure: { route: 'gateway', status: 401 },
-      skip: { skipReason: 'klucz bramki AI odrzucony (401)', failsCheck: false, fallback: false, skipDetail: '' },
+      skip: { skipReason: 'AI gateway key rejected (401)', failsCheck: false, fallback: false, skipDetail: '' },
     },
     {
       failure: { route: 'gateway', status: 400 },
-      skip: { skipReason: 'bramka AI odrzuciła żądanie (400)', failsCheck: true, fallback: false, skipDetail: '' },
+      skip: { skipReason: 'AI gateway rejected the request (400)', failsCheck: true, fallback: false, skipDetail: '' },
     },
     {
       failure: { route: 'gateway', status: 503 },
-      skip: { skipReason: 'bramka AI niedostępna (503)', failsCheck: false, fallback: false, skipDetail: '' },
+      skip: { skipReason: 'AI gateway unavailable (503)', failsCheck: false, fallback: false, skipDetail: '' },
     },
   ];
   for (const { failure, skip } of cases) {

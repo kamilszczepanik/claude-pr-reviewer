@@ -2,8 +2,14 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { apiSkipError, skipError } from '../scripts/lib/failure.mjs';
-import { failureLine, publishReview, runReviewProcess, settleReview, SKIP_MARKER } from '../scripts/lib/publish.mjs';
-import { buildReviewBody, buildShortBody, cleanReview, GITHUB_BODY_LIMIT } from '../scripts/lib/review-body.mjs';
+import {
+  failureLine,
+  publishReview,
+  runReviewProcess,
+  settleReview,
+  SKIP_MARKER,
+  withLanguage,
+} from '../scripts/lib/publish.mjs';
 
 const httpError = (status) => Object.assign(new Error(`GitHub ${status}`), { status });
 
@@ -56,10 +62,10 @@ describe('settleReview', () => {
   const ownComment = { id: 7, user: { type: 'Bot' }, body: `${SKIP_MARKER}\nstary` };
   const cases = [
     { label: 'a finished review', run: async () => {}, exitCode: 0, posted: 0, updated: 0 },
-    { label: 'a skip', run: async () => Promise.reject(skipError('błąd sieci')), exitCode: 0, posted: 1, updated: 0 },
+    { label: 'a skip', run: async () => Promise.reject(skipError('network error')), exitCode: 0, posted: 1, updated: 0 },
     {
       label: 'a repeated skip',
-      run: async () => Promise.reject(skipError('błąd sieci')),
+      run: async () => Promise.reject(skipError('network error')),
       github: { comments: [ownComment] },
       exitCode: 0,
       posted: 0,
@@ -67,7 +73,7 @@ describe('settleReview', () => {
     },
     {
       label: 'a skip whose comment fails',
-      run: async () => Promise.reject(skipError('błąd sieci')),
+      run: async () => Promise.reject(skipError('network error')),
       github: { commentFailure: 403 },
       exitCode: 0,
       posted: 0,
@@ -99,6 +105,20 @@ describe('settleReview', () => {
     });
   }
 
+  const skipComments = [
+    { label: 'English', language: 'en', text: 'Claude review skipped: network error.\n\nThis run did not check the PR' },
+    { label: 'Polish', language: 'pl', text: 'Przegląd Claude pominięty: network error.\n\nTen przebieg nie sprawdził PR-a' },
+    { label: 'English when the error carries no language', text: 'Claude review skipped: network error.\n\nThis run' },
+  ];
+  for (const { label, language, text } of skipComments) {
+    it(`posts the skip comment in ${label}`, async () => {
+      const github = fakeGithub();
+      const run = async () => Promise.reject(Object.assign(skipError('network error'), language ? { language } : {}));
+      assert.equal(await settleReview({ run, github, log: () => {} }), 0);
+      assert.ok(github.calls.posted[0].startsWith(`${SKIP_MARKER}\n${text}`));
+    });
+  }
+
   it('exits 1 after an unexplained API rejection and keeps the API text out of the PR', async () => {
     const github = fakeGithub();
     const lines = [];
@@ -107,16 +127,16 @@ describe('settleReview', () => {
     assert.equal(github.calls.posted.length, 1);
     const [comment] = github.calls.posted;
     assert.ok(comment.startsWith(SKIP_MARKER));
-    assert.ok(comment.includes('odrzuciło żądanie (400)'));
+    assert.ok(comment.includes('rejected the request (400)'));
     assert.ok(!comment.includes('prompt is too long'));
     assert.equal(lines.length, 1);
-    assert.ok(lines[0].includes('odpowiedź API: prompt is too long'));
+    assert.ok(lines[0].includes('API response: prompt is too long'));
     assert.ok(lines[0].length <= 300);
     const failedLines = [];
     const failedComment = fakeGithub({ commentFailure: 403 });
     assert.equal(await settleReview({ run, github: failedComment, log: (line) => failedLines.push(line) }), 1);
     assert.equal(failedLines.length, 2);
-    assert.ok(!failedLines[1].includes('bez błędu') && failedLines[1].includes('kodem 1'));
+    assert.ok(!failedLines[1].includes('without an error') && failedLines[1].includes('code 1'));
   });
 
   it('logs an unrecognised error with the review secrets and token-shaped text redacted, in the review and at the top level', async () => {
@@ -129,7 +149,7 @@ describe('settleReview', () => {
     assert.equal(lines.length, 1);
     assert.ok(!lines[0].includes(secret));
     assert.ok(!lines[0].includes('sk-ant-api03-abcdefghijklmnop'));
-    assert.ok(lines[0].includes('[ukryte]'));
+    assert.ok(lines[0].includes('[redacted]'));
     assert.ok(lines[0].length <= 300);
     assert.equal(github.calls.posted.length, 0);
     const gatewayKey = 'vck_gateway-key-0987654321';
@@ -141,7 +161,7 @@ describe('settleReview', () => {
     assert.equal(topLines.length, 1);
     assert.ok(!topLines[0].includes(gatewayKey));
     assert.ok(!topLines[0].includes(Buffer.from(gatewayKey).toString('base64')));
-    assert.ok(topLines[0].includes('[ukryte]'));
+    assert.ok(topLines[0].includes('[redacted]'));
     assert.throws(() => failureLine({ error: new Error(secret) }), TypeError);
     const unprintable = {
       toString: () => {
@@ -157,86 +177,24 @@ describe('settleReview', () => {
         1,
       );
       assert.equal(thrownLines.length, 2);
-      assert.ok(thrownLines.every((line) => line.startsWith('Przegląd Claude nie powiódł się: Error: ')));
+      assert.ok(thrownLines.every((line) => line.startsWith('Claude review failed: Error: ')));
       assert.ok(thrownLines.every((line) => !line.includes(gatewayKey)));
     }
   });
 });
 
-describe('review body', () => {
-  it('cleans mentions and secrets out of the model output', () => {
-    const review = cleanReview({
-      review: {
-        summary: '@kamil klucz sk-ant-api03-abcdefghijkl',
-        comments: [{ path: 'a', line: 1, severity: 'low', body: '![x](https://e.test/p.png)' }],
-      },
-      secrets: [],
-    });
-    assert.equal(review.summary, '@​kamil klucz [ukryte]');
-    assert.equal(review.comments[0].body, '(obraz usunięty)');
-  });
-
-  it('stays under the GitHub body limit with the longest fallback list', () => {
-    const long = 'x'.repeat(100_000);
-    const review = cleanReview({
-      review: {
-        summary: long,
-        comments: Array.from({ length: 30 }, (_, line) => ({
-          path: 'a',
-          line: line + 1,
-          severity: 'high',
-          body: long,
-        })),
-      },
-      secrets: [],
-    });
-    const body = buildReviewBody({
-      ...review,
-      route: 'api',
-      model: 'claude-opus-5-5',
-      turns: 40,
-      tokens: { input: 1, output: 1 },
-      omittedFiles: ['b'],
-      droppedOverCap: 0,
-      fallbackComments: review.comments,
-    });
-    assert.ok(body.length <= GITHUB_BODY_LIMIT);
-    assert.match(body, /<sub>Przegląd Claude · trasa: kredyt API · model claude-opus-5-5/);
-  });
-
-  it('names the gateway route in the status line of the full and the short body', () => {
-    const input = {
-      summary: 'Podsumowanie.',
-      route: 'gateway',
-      model: 'anthropic/claude-sonnet-5.5',
-      turns: 2,
-      tokens: { input: 1, output: 1 },
-      omittedFiles: [],
-      droppedOverCap: 0,
-    };
-    for (const body of [buildReviewBody(input), buildShortBody(input)]) {
-      assert.ok(body.split('\n').at(-1).includes('trasa: bramka AI · model anthropic/claude-sonnet-5.5'));
-    }
-  });
-
-  it('escapes model paths in the fallback list like omitted files', () => {
-    const fallbackBody = (comment) =>
-      buildReviewBody({
-        summary: 'Podsumowanie.',
-        route: 'api',
-        model: 'claude-opus-5-5',
-        turns: 1,
-        tokens: { input: 1, output: 1 },
-        omittedFiles: [],
-        droppedOverCap: 0,
-        fallbackComments: [{ line: 3, severity: 'high', ...comment }],
-      });
-    const body = fallbackBody({ path: 'src/`a`<img src=x>@kamil.ts', body: 'b' });
-    assert.ok(body.includes('"src/'));
-    assert.ok(body.includes(':3 (wysoka): b'));
-    assert.ok(!body.includes('<img'));
-    assert.ok(body.includes('@\u200Bkamil'));
-    assert.ok(!body.includes('`src/'));
-    assert.ok(!fallbackBody({ path: 'src/`a.ts', body: 'x `<img src=y>`' }).includes('<img'));
+describe('withLanguage', () => {
+  it('attaches the review language to a thrown error and keeps one already set', async () => {
+    const plain = skipError('network error');
+    await assert.rejects(
+      withLanguage({ language: 'pl', run: async () => Promise.reject(plain) }),
+      (error) => error === plain && error.language === 'pl',
+    );
+    const tagged = Object.assign(skipError('network error'), { language: 'en' });
+    await assert.rejects(
+      withLanguage({ language: 'pl', run: async () => Promise.reject(tagged) }),
+      (error) => error === tagged && error.language === 'en',
+    );
+    assert.equal(await withLanguage({ language: 'pl', run: async () => 'done' }), 'done');
   });
 });

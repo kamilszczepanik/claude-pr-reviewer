@@ -9,7 +9,7 @@ describe('firstRoute', () => {
     { keys: { apiKey: 'sk-ant', gatewayKey: null }, route: 'api' },
     { keys: { apiKey: 'sk-ant', gatewayKey: 'vck' }, route: 'api' },
     { keys: { apiKey: null, gatewayKey: 'vck' }, route: 'gateway' },
-    { keys: { apiKey: null, gatewayKey: null }, skipReason: 'brak sekretu ANTHROPIC_API_KEY ani AI_GATEWAY_API_KEY' },
+    { keys: { apiKey: null, gatewayKey: null }, skipReason: 'no ANTHROPIC_API_KEY or AI_GATEWAY_API_KEY secret' },
   ];
   for (const { keys, route, skipReason } of cases) {
     it(`starts on the API credit and goes straight to the gateway without an API key: ${JSON.stringify(keys)}`, () => {
@@ -53,7 +53,7 @@ describe('runRoutedReview', () => {
   const MINUTE = 60_000;
   const API_CALL = { route: 'api', model: API_MODEL, timeoutMs: 15 * MINUTE };
   const GATEWAY_CALL = { route: 'gateway', model: GATEWAY_MODEL, timeoutMs: 15 * MINUTE };
-  const SWITCH_LOG = 'Trasa kredyt API: wyczerpany kredyt API Anthropic; ponawiam przez bramkę AI';
+  const SWITCH_LOG = 'Route API credit: Anthropic API credit exhausted; retrying through the AI gateway';
   const credit = apiSkipError({ status: 400, message: 'Your credit balance is too low', secrets: [] });
   const apiRejected = apiSkipError({ status: 401, secrets: [] });
   const budget = apiSkipError({ route: 'gateway', status: 402, message: 'quota_for_entity_exceeded', secrets: [] });
@@ -93,7 +93,7 @@ describe('runRoutedReview', () => {
       outcomes: { api: credit },
       calls: [API_CALL],
       thrown: {
-        skipReason: 'wyczerpany kredyt API Anthropic; bramka AI nieskonfigurowana (brak sekretu AI_GATEWAY_API_KEY)',
+        skipReason: 'Anthropic API credit exhausted; AI gateway not configured (no AI_GATEWAY_API_KEY secret)',
         failsCheck: false,
         skipDetail: 'Your credit balance is too low',
       },
@@ -113,7 +113,7 @@ describe('runRoutedReview', () => {
       outcomes: { api: credit, gateway: budget },
       calls: [API_CALL, GATEWAY_CALL],
       thrown: {
-        skipReason: 'wyczerpany kredyt API Anthropic; bramka AI: wyczerpany budżet klucza bramki AI',
+        skipReason: 'Anthropic API credit exhausted; AI gateway: key budget exhausted',
         failsCheck: false,
         skipDetail: 'quota_for_entity_exceeded',
       },
@@ -125,7 +125,7 @@ describe('runRoutedReview', () => {
       outcomes: { api: credit, gateway: gatewayRejected },
       calls: [API_CALL, GATEWAY_CALL],
       thrown: {
-        skipReason: 'wyczerpany kredyt API Anthropic; bramka AI: odrzuciła żądanie (400)',
+        skipReason: 'Anthropic API credit exhausted; AI gateway: rejected the request (400)',
         failsCheck: true,
         skipDetail: 'bad request',
       },

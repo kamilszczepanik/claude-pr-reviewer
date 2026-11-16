@@ -55,7 +55,7 @@ jobs:
         run: |
           case "$PR_NUMBER" in
             '' | *[!0-9]*)
-              echo "Numer PR musi być liczbą"
+              echo "PR number must be a number"
               exit 1
               ;;
           esac
@@ -65,7 +65,7 @@ jobs:
           echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
           echo "head-sha=$head_sha" >> "$GITHUB_OUTPUT"
           if [ "$head_repo" != "$GITHUB_REPOSITORY" ]; then
-            echo "Przegląd Claude pominięty: PR z forka nie dostaje sekretów"
+            echo "Claude review skipped: a fork PR gets no secrets"
             echo "fork=true" >> "$GITHUB_OUTPUT"
           else
             echo "fork=false" >> "$GITHUB_OUTPUT"
@@ -87,7 +87,7 @@ jobs:
 
       - name: Review with Claude
         if: steps.pr.outputs.fork == 'false'
-        uses: kamilszczepanik/claude-pr-reviewer@2ba5bce5c3110ed08d74a1971cbcc33e4bd8e4b2  # v1.4.1
+        uses: kamilszczepanik/claude-pr-reviewer@f534ac51bcc64d751c4a1973abffce7af8769132  # v1.5.0
         with:
           model: ${{ inputs.model }}
           max-comments: ${{ inputs.max-comments }}

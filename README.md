@@ -44,7 +44,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: kamilszczepanik/claude-pr-reviewer/.github/workflows/review.yml@2d24e5d68433b0e014ee1c7ade9207acb8bc587e
+    uses: kamilszczepanik/claude-pr-reviewer/.github/workflows/review.yml@9a9f06675ac799e0ddce4d160899d15a51a8f8c0
     with:
       pr-number: ${{ inputs.pr-number }}
     secrets:
@@ -65,6 +65,7 @@ caller's `dependabot.yml` to get a pull request for each new release.
 
 | Version  | SHA                                        |
 | -------- | ------------------------------------------ |
+| `v1.5.0` | `9a9f06675ac799e0ddce4d160899d15a51a8f8c0` |
 | `v1.4.1` | `2d24e5d68433b0e014ee1c7ade9207acb8bc587e` |
 | `v1.4.0` | `1313a005734da1b79cea63a5001594c74efb94d7` |
 | `v1.3.0` | `725b78491692931764120191d62166f253e470a6` |
@@ -76,14 +77,14 @@ caller's `dependabot.yml` to get a pull request for each new release.
 
 All inputs of the reusable workflow (`workflow_call`) are optional:
 
-| Input            | Type   | Default                       | Meaning                                                              |
-| ---------------- | ------ | ----------------------------- | -------------------------------------------------------------------- |
-| `model`          | string | `claude-sonnet-5-5`           | Claude model id                                                      |
-| `max-comments`   | number | 15                            | maximum inline comments; the rest are counted in the summary         |
-| `max-diff-bytes` | number | 150000                        | diff size sent to the model, cut at file boundaries, smallest first  |
-| `max-budget-usd` | number | 2                             | hard cost cap of one review; above it the review is skipped          |
-| `pr-number`      | string | empty                         | pull request number for a manual rerun; digits only                  |
-| `gateway-model`  | string | `anthropic/claude-sonnet-5.5` | model id on the AI Gateway route                                     |
+| Input            | Type   | Default                       | Meaning                                                             |
+| ---------------- | ------ | ----------------------------- | ------------------------------------------------------------------- |
+| `model`          | string | `claude-sonnet-5-5`           | Claude model id                                                     |
+| `max-comments`   | number | 15                            | maximum inline comments; the rest are counted in the summary        |
+| `max-diff-bytes` | number | 150000                        | diff size sent to the model, cut at file boundaries, smallest first |
+| `max-budget-usd` | number | 2                             | hard cost cap of one review; above it the review is skipped         |
+| `pr-number`      | string | empty                         | pull request number for a manual rerun; digits only                 |
+| `gateway-model`  | string | `anthropic/claude-sonnet-5.5` | model id on the AI Gateway route                                    |
 
 Secrets: `ANTHROPIC_API_KEY` and `AI_GATEWAY_API_KEY`, both optional, passed explicitly (not `secrets: inherit`).
 With neither, the review is skipped with a comment and no red check.
@@ -105,6 +106,15 @@ With neither, the review is skipped with a comment and no red check.
   are dropped. If GitHub rejects inline comments, the review falls back to a summary with the comments in the body.
 - Expected failures (exhausted credit, rate limits, rejected key, API outage, timeout, budget) post a "review
   skipped" comment and exit 0. Unexplained API errors and bugs exit 1.
+
+## Review language
+
+The review is written in English unless the repository rubric (`CLAUDE.md` and `AGENTS.md` on the base branch) is
+mostly Polish; then the summary, the comments and the fixed texts (status line, severity labels, the "review skipped"
+comment) are Polish. The language is decided in code from the share of Polish letters in the rubric prose, with code
+blocks and inline code left out, not by the model. A rubric read from the pull request head (no base commit in the
+checkout) never switches the language. A skip that happens before the rubric can be read (GitHub unreachable while
+fetching the pull request) is posted in English. Skip reasons and Actions logs are always English.
 
 ## Fallback route: Vercel AI Gateway
 

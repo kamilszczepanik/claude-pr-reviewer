@@ -15,28 +15,28 @@ const isClientError = (status) => status !== null && status >= 400 && status < 5
 
 const classifyApiFailure = ({ status, message }) => {
   if (status === 402 || (status !== null && status < 500 && CREDIT_EXHAUSTED.test(message))) {
-    return fallsBack('wyczerpany kredyt API Anthropic');
+    return fallsBack('Anthropic API credit exhausted');
   }
   if ((status === 400 || status === 429) && USAGE_LIMIT.test(message)) {
-    return fallsBack('wyczerpany limit użycia API Anthropic');
+    return fallsBack('Anthropic API usage limit exhausted');
   }
-  if (status === 429) return expected('limit zapytań albo wydatków workspace');
-  if (status === 401 || status === 403) return expected(`klucz API odrzucony (${status})`);
-  if (isClientError(status)) return rejected(`API Anthropic odrzuciło żądanie (${status})`);
-  if (status !== null && status >= 500) return expected(`API Anthropic niedostępne (${status})`);
-  if (NETWORK_FAILURE.test(message)) return expected('błąd sieci');
+  if (status === 429) return expected('workspace rate or spend limit reached');
+  if (status === 401 || status === 403) return expected(`API key rejected (${status})`);
+  if (isClientError(status)) return rejected(`Anthropic API rejected the request (${status})`);
+  if (status !== null && status >= 500) return expected(`Anthropic API unavailable (${status})`);
+  if (NETWORK_FAILURE.test(message)) return expected('network error');
   return null;
 };
 
 const classifyGatewayFailure = ({ status, message }) => {
   if (status === 402 || (status !== null && status < 500 && GATEWAY_BUDGET.test(message))) {
-    return expected('wyczerpany budżet klucza bramki AI');
+    return expected('AI gateway key budget exhausted');
   }
-  if (status === 429) return expected('limit zapytań bramki AI');
-  if (status === 401 || status === 403) return expected(`klucz bramki AI odrzucony (${status})`);
-  if (isClientError(status)) return rejected(`bramka AI odrzuciła żądanie (${status})`);
-  if (status !== null && status >= 500) return expected(`bramka AI niedostępna (${status})`);
-  if (NETWORK_FAILURE.test(message)) return expected('błąd sieci');
+  if (status === 429) return expected('AI gateway rate limit reached');
+  if (status === 401 || status === 403) return expected(`AI gateway key rejected (${status})`);
+  if (isClientError(status)) return rejected(`AI gateway rejected the request (${status})`);
+  if (status !== null && status >= 500) return expected(`AI gateway unavailable (${status})`);
+  if (NETWORK_FAILURE.test(message)) return expected('network error');
   return null;
 };
 
