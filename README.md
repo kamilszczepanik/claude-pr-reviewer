@@ -44,7 +44,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: kamilszczepanik/claude-pr-reviewer/.github/workflows/review.yml@da68017f50d4be602b7cfedb652b48063a775a30
+    uses: kamilszczepanik/claude-pr-reviewer/.github/workflows/review.yml@9a9f06675ac799e0ddce4d160899d15a51a8f8c0
     with:
       pr-number: ${{ inputs.pr-number }}
     secrets:
@@ -65,7 +65,7 @@ caller's `dependabot.yml` to get a pull request for each new release.
 
 | Version  | SHA                                        |
 | -------- | ------------------------------------------ |
-| `v1.5.0` | `da68017f50d4be602b7cfedb652b48063a775a30` |
+| `v1.5.0` | `9a9f06675ac799e0ddce4d160899d15a51a8f8c0` |
 | `v1.4.1` | `2d24e5d68433b0e014ee1c7ade9207acb8bc587e` |
 | `v1.4.0` | `1313a005734da1b79cea63a5001594c74efb94d7` |
 | `v1.3.0` | `725b78491692931764120191d62166f253e470a6` |
