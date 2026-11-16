@@ -6,7 +6,7 @@ import { createGithub } from './lib/github.mjs';
 import { detectReviewLanguage } from './lib/language.mjs';
 import { MESSAGES } from './lib/messages.mjs';
 import { buildPrompt, readRubric, systemPromptFor } from './lib/prompt.mjs';
-import { publishReview, runReviewProcess, settleReview } from './lib/publish.mjs';
+import { publishReview, runReviewProcess, settleReview, withLanguage } from './lib/publish.mjs';
 import { buildReviewBody, buildShortBody, cleanReview, toInlineComment } from './lib/review-body.mjs';
 import { selectComments } from './lib/review-result.mjs';
 import { firstRoute, runRoutedReview } from './lib/routes.mjs';
@@ -16,13 +16,13 @@ const DIFF_TOO_LARGE = 406;
 const log = (line) => console.log(line);
 
 const costLine = ({ route, costUsd }) =>
-  route === 'gateway' && costUsd === 0 ? 'koszt nieznany' : `koszt ${costUsd.toFixed(2)} USD`;
+  route === 'gateway' && costUsd === 0 ? 'cost unknown' : `cost ${costUsd.toFixed(2)} USD`;
 
 const fetchDiff = async ({ github, baseSha, headSha }) => {
   try {
     return await github.diff({ baseSha, headSha });
   } catch (error) {
-    if (error.status === DIFF_TOO_LARGE) throw skipError('diff za duży dla API GitHuba');
+    if (error.status === DIFF_TOO_LARGE) throw skipError('diff too large for the GitHub API');
     throw error;
   }
 };
@@ -44,16 +44,20 @@ const reviewAttempts = ({ headSha, review, bodyInput }) => {
   ];
 };
 
-const reviewPullRequest = async ({ config, github, secrets }) => {
-  const route = firstRoute(config);
-  const pullRequest = await github.pullRequest();
-  const headSha = config.headSha ?? pullRequest.head.sha;
-  const fullDiff = await fetchDiff({ github, baseSha: pullRequest.base.sha, headSha });
+const reviewWithRubric = async ({
+  config,
+  github,
+  secrets,
+  route,
+  pullRequest,
+  headSha,
+  fullDiff,
+  rubric,
+  language,
+}) => {
   const { diff, omittedFiles } = truncateDiff({ diff: fullDiff, maxBytes: config.maxDiffBytes });
-  const rubric = await readRubric({ repoDir: config.repoDir, baseSha: pullRequest.base.sha });
-  const language = detectReviewLanguage(rubric.text);
   log(
-    `Przegląd PR #${config.prNumber}: diff ${Buffer.byteLength(diff)} B, pominięte pliki ${omittedFiles.length}, rubryka z ${rubric.source}`,
+    `Review of PR #${config.prNumber}: diff ${Buffer.byteLength(diff)} B, omitted files ${omittedFiles.length}, rubric from ${rubric.source}, language ${language}`,
   );
   const prompt = buildPrompt({
     title: pullRequest.title,
@@ -103,8 +107,21 @@ const reviewPullRequest = async ({ config, github, secrets }) => {
   };
   const used = await publishReview({ github, attempts: reviewAttempts({ headSha, review: clean, bodyInput }) });
   log(
-    `Wynik: ${comments.length} uwag, wariant publikacji ${used}, poza diffem ${droppedOutsideDiff}, trasa ${MESSAGES.en.routes[outcome.route]}, model ${model}, tury ${turns}, tokeny ${tokens.input}/${tokens.output}, ${costLine({ route: outcome.route, costUsd })}, odmowy narzędzi ${denials}`,
+    `Result: ${comments.length} comments, publish variant ${used}, outside the diff ${droppedOutsideDiff}, route ${MESSAGES.en.routes[outcome.route]}, model ${model}, turns ${turns}, tokens ${tokens.input}/${tokens.output}, ${costLine({ route: outcome.route, costUsd })}, tool denials ${denials}`,
   );
+};
+
+const reviewPullRequest = async ({ config, github, secrets }) => {
+  const route = firstRoute(config);
+  const pullRequest = await github.pullRequest();
+  const headSha = config.headSha ?? pullRequest.head.sha;
+  const fullDiff = await fetchDiff({ github, baseSha: pullRequest.base.sha, headSha });
+  const rubric = await readRubric({ repoDir: config.repoDir, baseSha: pullRequest.base.sha });
+  const language = detectReviewLanguage(rubric.text);
+  return withLanguage({
+    language,
+    run: () => reviewWithRubric({ config, github, secrets, route, pullRequest, headSha, fullDiff, rubric, language }),
+  });
 };
 
 const main = async () => {

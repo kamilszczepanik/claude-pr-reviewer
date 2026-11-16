@@ -2,7 +2,14 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { apiSkipError, skipError } from '../scripts/lib/failure.mjs';
-import { failureLine, publishReview, runReviewProcess, settleReview, SKIP_MARKER } from '../scripts/lib/publish.mjs';
+import {
+  failureLine,
+  publishReview,
+  runReviewProcess,
+  settleReview,
+  SKIP_MARKER,
+  withLanguage,
+} from '../scripts/lib/publish.mjs';
 import {
   buildReviewBody,
   buildShortBody,
@@ -180,6 +187,22 @@ describe('settleReview', () => {
       assert.ok(thrownLines.every((line) => line.startsWith('Claude review failed: Error: ')));
       assert.ok(thrownLines.every((line) => !line.includes(gatewayKey)));
     }
+  });
+});
+
+describe('withLanguage', () => {
+  it('attaches the review language to a thrown error and keeps one already set', async () => {
+    const plain = skipError('network error');
+    await assert.rejects(
+      withLanguage({ language: 'pl', run: async () => Promise.reject(plain) }),
+      (error) => error === plain && error.language === 'pl',
+    );
+    const tagged = Object.assign(skipError('network error'), { language: 'en' });
+    await assert.rejects(
+      withLanguage({ language: 'pl', run: async () => Promise.reject(tagged) }),
+      (error) => error === tagged && error.language === 'en',
+    );
+    assert.equal(await withLanguage({ language: 'pl', run: async () => 'done' }), 'done');
   });
 });
 

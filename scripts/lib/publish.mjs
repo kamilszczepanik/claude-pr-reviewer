@@ -62,6 +62,15 @@ export const failureLine = ({ error: thrown, secrets }) => {
   return `Claude review failed: ${error.name}: ${detail}`.slice(0, MAX_LOG_CHARS);
 };
 
+export const withLanguage = async ({ language, run }) => {
+  try {
+    return await run();
+  } catch (error) {
+    if (error !== null && typeof error === 'object' && error.language === undefined) error.language = language;
+    throw error;
+  }
+};
+
 export const settleReview = async ({ run, github, log, secrets = [] }) => {
   try {
     await run();
