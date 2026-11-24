@@ -3,45 +3,42 @@ import { describe, it } from 'node:test';
 
 import { detectReviewLanguage } from '../scripts/lib/language.mjs';
 
-const ASYSTENT = `## CLAUDE.md
+const POLISH_RUBRIC = `## CLAUDE.md
 
-# Asystent bezpieczeństwa — repozytorium produktu
+# Katalog biblioteki miejskiej: repozytorium aplikacji
 
-To jest **repozytorium produktu**, nie dokumentów. Monorepo pnpm + turbo.
-Poprzednia reguła zakazująca \`package.json\`, lintera i narzędzi JS **już nie obowiązuje**.
+To jest **repozytorium aplikacji**, nie dokumentacji. Monorepo pnpm z dwoma pakietami.
+Stara reguła, która zabraniała \`package.json\` i lintera w korzeniu, **już nie obowiązuje**.
 
-Dokumenty, notatki, plany i makiety żyją w \`~/workspace/projects/docs/\`, nie tutaj.
-To samo dotyczy kroków ręcznych po przebiegu: trafiają do
-\`~/workspace/projects/docs/asystent/kroki-reczne/RRRR-MM-DD-<slug>.md\`, nigdy do
-\`docs/\` w tym repozytorium.
+Notatki, plany i szkice ekranów trzymamy w \`docs/\`, a nie obok kodu.
+Kroki ręczne po wdrożeniu zapisujemy w \`docs/kroki/RRRR-MM-DD-<opis>.md\`, nigdy w komentarzach.
 
 ## Układ
 
-- \`landing-page/\` — publiczna strona produktowa, pakiet \`landing-page\` (port 4100)
-- \`apps/resident/web/\` — platforma mieszkańca, pakiet \`resident-app\` (4101)
-- \`apps/resident/api/\` — API mieszkańca, NestJS, pakiet \`resident-api\` (4110); moduł pism
-  \`apps/resident/api/src/letters/\` ma jako jedyny w sprawach \`providers\` i importuje \`SpendModule\`,
-  bo \`CasesModule\` jest bez DI.
-- \`apps/city-hall/web/\` — panel miasta, pakiet \`city-hall-app\` (4102)
-- \`apps/city-hall/api/\` — API miasta, NestJS, pakiet \`city-hall-api\` (4111)`;
+- \`apps/catalog/web/\`: katalog dla czytelników, pakiet \`catalog-web\` (port 3000)
+- \`apps/catalog/api/\`: API katalogu, pakiet \`catalog-api\` (port 3001); moduł wypożyczeń
+  \`apps/catalog/api/src/loans/\` jako jedyny korzysta z kolejki i importuje \`QueueModule\`,
+  bo \`BooksModule\` działa bez niej.
+- \`apps/staff/web/\`: panel bibliotekarza, pakiet \`staff-web\` (port 3002)
+- \`packages/shared/\`: stałe wspólne dla obu aplikacji, pakiet \`@library/shared\``;
 
-const PLATERO = `## CLAUDE.md
+const ENGLISH_RUBRIC = `## CLAUDE.md
 
-# Platero AI — AI Review Auto-Responder
+# Fieldnotes: offline note taking for field researchers
 
 The two rules that get broken most, so they open and close this file: **no
-comments in code**, and **read \`docs/design/design-system.md\` before any UI work
-in \`apps/web\`**.
+comments in code**, and **read \`docs/ui-guidelines.md\` before any UI work
+in \`apps/mobile\`**.
 
 ## Product Context
 
-AI-powered Google review auto-responder for restaurants. First module of a restaurant growth platform. Generates personalized, on-brand responses to every Google review. Owner approves with one click. Starter $9/mo per location (30 AI drafts a month), Pro $29/mo per location (unlimited drafts, voice learning, Topics, auto-reply). Tiers are mixable within one account.`;
+A mobile app that lets field researchers take notes, photos and voice memos without a network and syncs them later. Notes sync in the background when a connection returns. Conflicts are shown side by side and the researcher picks one version. Exports go to CSV and Markdown. Every screen must work with one hand.`;
 
-const DG_CARS = `## CLAUDE.md
+const ENGLISH_RUBRIC_QUOTING_POLISH = `## CLAUDE.md
 
-# dg-cars
+# bakery-orders
 
-Polish car-parts shop. Routes, UI copy and user-facing messages are Polish —
+Online orders for a small Polish bakery. Routes, UI copy and user-facing messages are Polish;
 match the tone already in the file rather than translating from English.
 
 ## Language
@@ -52,7 +49,7 @@ types, props, constants, CSS classes, package scripts, branches, commits.
 Anything a user reads is Polish: UI copy, \`alt\` text, metadata values.
 
 The exception, because they are addresses: route directories under \`src/app\`
-(\`koszyk\`, \`dostawa\`, \`sposob-platnosci\`). A constant's name is English, its value
+(\`zamówienie\`, \`dostawa\`, \`płatność\`). A constant's name is English, its value
 is not.`;
 
 const POLISH_CODE = `Copy lives in one constant:
@@ -70,14 +67,14 @@ Dziękujemy za zamówienie! Wyślemy potwierdzenie na Twój adres e-mail, gdy pa
 
 describe('detectReviewLanguage', () => {
   const cases = [
-    { label: 'the asystent rubric', text: ASYSTENT, language: 'pl' },
-    { label: 'the platero-ai rubric', text: PLATERO, language: 'en' },
-    { label: 'the dg-cars rubric quoting Polish copy', text: DG_CARS, language: 'en' },
+    { label: 'a Polish rubric', text: POLISH_RUBRIC, language: 'pl' },
+    { label: 'an English rubric', text: ENGLISH_RUBRIC, language: 'en' },
+    { label: 'an English rubric quoting Polish copy', text: ENGLISH_RUBRIC_QUOTING_POLISH, language: 'en' },
     { label: 'an empty rubric', text: '', language: 'en' },
     { label: 'whitespace and markdown only', text: '## \n\n- `` \n---\n|  |  |\n', language: 'en' },
-    { label: 'English prose around Polish code', text: `${PLATERO}\n\n${POLISH_CODE}`, language: 'en' },
-    { label: 'Polish prose around English code', text: `${ASYSTENT}\n\n\`\`\`sh\n${PLATERO}\n${PLATERO}\n\`\`\``, language: 'pl' },
-    { label: 'a Polish rubric from the head branch', text: ASYSTENT, source: 'head', language: 'en' },
+    { label: 'English prose around Polish code', text: `${ENGLISH_RUBRIC}\n\n${POLISH_CODE}`, language: 'en' },
+    { label: 'Polish prose around English code', text: `${POLISH_RUBRIC}\n\n\`\`\`sh\n${ENGLISH_RUBRIC}\n${ENGLISH_RUBRIC}\n\`\`\``, language: 'pl' },
+    { label: 'a Polish rubric from the head branch', text: POLISH_RUBRIC, source: 'head', language: 'en' },
   ];
   for (const { label, text, source = 'base', language } of cases) {
     it(`reads ${label} as ${language}`, () => {
