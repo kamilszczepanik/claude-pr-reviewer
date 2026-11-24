@@ -18,8 +18,8 @@ is `v2`. A release pull request ends with three commits:
 1. Code plus `version` in `package.json` and `package-lock.json`. This commit is the action SHA.
 2. `.github/workflows/review.yml` calls `kamilszczepanik/claude-pr-reviewer@<action SHA> # v1.x.y`. This commit is
    the release SHA.
-3. The release SHA in the README quick start example, a new top row in the README pin table and in
-   `.github/workflows/claude-review.yml`.
+3. The release SHA in the README quick start example, a new top row in the README pin table, in both files in
+   `examples/` and in `.github/workflows/claude-review.yml`.
 
 Merge with a merge commit only (squash and rebase change the SHAs). `npm test` checks that the code under every pin
 matches the tree.
